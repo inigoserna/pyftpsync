@@ -1,8 +1,8 @@
 # -*- coding: iso-8859-1 -*-
 """
-SCIO-Portal collector tool.
+Simple folder synchronisation using FTP.
 
-(c) 2012 Martin Wendt; see http://pyftpsync.googlecode.com/
+(c) 2012-2014 Martin Wendt; see https://github.com/mar10/pyftpsync
 Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
 
 Usage examples:
@@ -11,9 +11,15 @@ Usage examples:
 """
 from __future__ import print_function
 
-from ftpsync.targets import make_target, UploadSynchronizer, FsTarget,\
-    DownloadSynchronizer
 from pprint import pprint
+
+from ftpsync._version import __version__
+from ftpsync.targets import make_target, FsTarget
+
+from ftpsync.synchronizers import UploadSynchronizer, \
+    DownloadSynchronizer, BiDirSynchronizer
+
+
 #def disable_stdout_buffering():
 #    """http://stackoverflow.com/questions/107705/python-output-buffering"""
 #    # Appending to gc.garbage is a way to stop an object from being
@@ -22,8 +28,6 @@ from pprint import pprint
 #    gc.garbage.append(sys.stdout)
 #    sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
 #disable_stdout_buffering()
-
-
 try:
     import argparse
 except ImportError:
@@ -31,7 +35,6 @@ except ImportError:
     raise
 
 
-from ftpsync._version import __version__
 
 
 def namespace_to_dict(o):
@@ -79,27 +82,27 @@ def run():
     
     # create the parser for the "upload" command
     upload_parser = subparsers.add_parser("upload", 
-                                           help="copy new and modified files to remote folder")
+                                          help="copy new and modified files to remote folder")
     upload_parser.add_argument("local", 
-                             metavar="LOCAL",
+                               metavar="LOCAL",
 #                             required=True,
-                             default=".",
-                             help="path to local folder (default: %(default)s)")      
+                               default=".",
+                               help="path to local folder (default: %(default)s)")      
     upload_parser.add_argument("remote", 
-                             metavar="REMOTE",
+                               metavar="REMOTE",
 #                             required=True,
 #                             default=".",
-                             help="path to remote folder")
+                               help="path to remote folder")
     upload_parser.add_argument("--force", 
-                             action="store_true",
-                             help="overwrite different remote files, even if the target is newer")
+                               action="store_true",
+                               help="overwrite different remote files, even if the target is newer")
     upload_parser.add_argument("--delete", 
-                             action="store_true",
-                             help="remove remote files if they don't exist locally")
+                               action="store_true",
+                               help="remove remote files if they don't exist locally")
     upload_parser.add_argument("--delete-unmatched", 
-                             action="store_true",
-                             help="remove remote files if they don't exist locally "
-                             "or don't match the current filter (implies '--delete' option)")
+                               action="store_true",
+                               help="remove remote files if they don't exist locally "
+                               "or don't match the current filter (implies '--delete' option)")
 #    upload_parser.add_argument("--dry-run", 
 #                             action="store_true",
 #                             help="just simulate and log results; don't change anything")
@@ -126,29 +129,61 @@ def run():
                                  default=".",
                                  help="path to local folder (default: %(default)s)")
     download_parser.add_argument("remote", 
-                                  metavar="REMOTE",
-                                  help="path to remote folder")
+                                 metavar="REMOTE",
+                                 help="path to remote folder")
     download_parser.add_argument("--force", 
-                             action="store_true",
-                             help="overwrite different local files, even if the target is newer")
+                                 action="store_true",
+                                 help="overwrite different local files, even if the target is newer")
     download_parser.add_argument("--delete", 
-                             action="store_true",
-                             help="remove local files if they don't exist on remote target")
+                                 action="store_true",
+                                 help="remove local files if they don't exist on remote target")
     download_parser.add_argument("--delete-unmatched", 
-                             action="store_true",
-                             help="remove local files if they don't exist on remote target "
-                             "or don't match the current filter (implies '--delete' option)")
+                                 action="store_true",
+                                 help="remove local files if they don't exist on remote target "
+                                 "or don't match the current filter (implies '--delete' option)")
     download_parser.add_argument("-x", "--execute", 
-                               action="store_false", dest="dry_run", default=True,
-                               help="turn off the dry-run mode (which is ON by default), "
-                               "that would just print status messages but does "
-                               "not change anything")
+                                 action="store_false", dest="dry_run", default=True,
+                                 help="turn off the dry-run mode (which is ON by default), "
+                                 "that would just print status messages but does "
+                                 "not change anything")
     download_parser.add_argument("-f", "--include-files", 
-                               help="wildcard for file names (default: all, "
-                               "separate multiple values with ',')")
+                                 help="wildcard for file names (default: all, "
+                                 "separate multiple values with ',')")
     download_parser.add_argument("-o", "--omit", 
-                               help="wildcard of files and directories to exclude (applied after --include)")
+                                 help="wildcard of files and directories to exclude (applied after --include)")
     download_parser.set_defaults(command="download")
+    
+    # create the parser for the "sync" command
+    sync_parser = subparsers.add_parser("sync", 
+            help="synchronize new and modified files between remote folder and local target")
+    sync_parser.add_argument("local", 
+                             metavar="LOCAL",
+                             default=".",
+                             help="path to local folder (default: %(default)s)")
+    sync_parser.add_argument("remote", 
+                             metavar="REMOTE",
+                             help="path to remote folder")
+    sync_parser.add_argument("--force", 
+                             action="store_true",
+                             help="overwrite conflicted files with newer version")
+#     sync_parser.add_argument("--delete", 
+#                              action="store_true",
+#                              help="remove local files if they don't exist on remote target")
+#     sync_parser.add_argument("--delete-unmatched", 
+#                              action="store_true",
+#                              help="remove local files if they don't exist on remote target "
+#                              "or don't match the current filter (implies '--delete' option)")
+    sync_parser.add_argument("-x", "--execute", 
+                             action="store_false", dest="dry_run", default=True,
+                             help="turn off the dry-run mode (which is ON by default), "
+                             "that would just print status messages but does "
+                             "not change anything")
+    sync_parser.add_argument("-f", "--include-files", 
+                             help="wildcard for file names (default: all, "
+                             "separate multiple values with ',')")
+    sync_parser.add_argument("-o", "--omit", 
+                             help="wildcard of files and directories to exclude (applied after --include)")
+    sync_parser.set_defaults(command="synchronize")
     
     # Parse command line
     args = parser.parse_args()
@@ -156,7 +191,7 @@ def run():
     # Post-process and check arguments
     args.verbose -= args.quiet
     del args.quiet
-    if args.delete_unmatched:
+    if hasattr(args, "delete_unmatched") and args.delete_unmatched:
         args.delete = True
     if args.remote == ".":
         parser.error("'.' is expected to be the local target")
@@ -169,7 +204,7 @@ def run():
     if not isinstance(args.local_target, FsTarget) and isinstance(args.remote_target, FsTarget):
         parser.error("a file system target is expected to be local")
 
-    # Let the command handler do it's thing
+    # Let the command handler do its thing
 #    args.handler(parser, args)
     opts = namespace_to_dict(args)
     if args.command == "upload":
@@ -177,7 +212,7 @@ def run():
     elif args.command == "download":
         s = DownloadSynchronizer(args.local_target, args.remote_target, opts)
     elif args.command == "synchronize":
-        s = BidirSynchronizer(args.local_target, args.remote_target, opts)
+        s = BiDirSynchronizer(args.local_target, args.remote_target, opts)
     else:
         parser.error("unknown command %s" % args.command)
     s.run()
@@ -189,7 +224,7 @@ def run():
         if args.dry_run:
             print("(DRY-RUN) ", end="")
         print("Wrote %s/%s files in %s dirs. Elap: %s" 
-              % (stats["files_written"], stats["local_files"], stats["local_dirs"], stats["elap"]))
+              % (stats["files_written"], stats["local_files"], stats["local_dirs"], stats["elap_str"]))
     
 
 # Script entry point

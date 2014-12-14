@@ -31,7 +31,7 @@ setup(name="pyftpsync",
       author_email = "pyftpsync@wwwendt.de",
       maintainer = "Martin Wendt",
       maintainer_email = "pyftpsync@wwwendt.de",
-      url = "http://pyftpsync.googlecode.com/",
+      url = "https://github.com/mar10/pyftpsync",
       description = "Synchronize folders over FTP.",
       long_description = readme, #+ "\n\n" + changes,
 
@@ -40,7 +40,7 @@ setup(name="pyftpsync",
         #Development Status :: 4 - Beta
         #Development Status :: 5 - Production/Stable
 
-      classifiers = ["Development Status :: 3 - Alpha",
+      classifiers = ["Development Status :: 4 - Beta",
                      "Environment :: Console",
                      "Intended Audience :: Information Technology",
                      "Intended Audience :: Developers",

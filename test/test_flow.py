@@ -1,6 +1,6 @@
 # -*- coding: UTF-8 -*-
 """
-Tests for scioweb.eplm.formsheets.eplm_base
+Tests for pyftpsync
 """
 import unittest
 

@@ -1,10 +1,10 @@
 # pyftpsync [![Build Status](https://travis-ci.org/mar10/pyftpsync.png?branch=master)](https://travis-ci.org/mar10/pyftpsync) [![Latest Version](https://pypip.in/v/pyftpsync/badge.png)](https://pypi.python.org/pypi/pyftpsync/) [![Downloads](https://pypip.in/d/pyftpsync/badge.png)](https://pypi.python.org/pypi/pyftpsync/) [![License](https://pypip.in/license/pyftpsync/badge.png)](https://pypi.python.org/pypi/pyftpsync/)
-Copyright (c) 2013 Martin Wendt
+Copyright (c) 2012-2014 Martin Wendt
 
 Synchronize local directories with FTP server.
 
 ## Status
-*This project has alpha status: (under development) use at your own risk!*
+*This project has beta status: (under development) use at your own risk!*
 
 Please submit bugs as you find them.
 
@@ -54,7 +54,7 @@ After that the `ftpsync` package is available:
 $ python
 >>> from ftpsync import __version__
 >>> __version__
-'0.0.1pre'
+'0.2.1'
 ```
 
 *Script example*
@@ -146,3 +146,9 @@ Add the ´-x´ option to switch from DRY-RUN mode to real execution:
 ```bash
 $ pyftpsync upload ~/temp ftp://example.com/target/folder --delete -x
 ```
+
+
+## FAQ
+
+  * Passwords may be stored and read from a custom file:
+    https://github.com/mar10/pyftpsync/blob/master/ftpsync/sample_pyftpsync.pw

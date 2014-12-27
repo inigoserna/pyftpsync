@@ -1,6 +1,6 @@
 # -*- coding: iso-8859-1 -*-
 """
-(c) 2012-2014 Martin Wendt; see https://github.com/mar10/pyftpsync
+(c) 2012-2015 Martin Wendt; see https://github.com/mar10/pyftpsync
 Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
 """
 
@@ -9,9 +9,13 @@ from __future__ import print_function
 import fnmatch
 import sys
 import time
+from datetime import datetime
 
 from ftpsync.targets import FileEntry, DirectoryEntry, IS_REDIRECTED, \
     DRY_RUN_PREFIX, DirMetadata
+
+def _ts(timestamp):
+    return "{} ({})".format(datetime.fromtimestamp(timestamp), timestamp)
 
 
 #===============================================================================
@@ -42,6 +46,10 @@ class BaseSynchronizer(object):
         if self.omit:
             self.omit = [ pat.strip() for pat in self.omit.split(",") ]
         
+        self.local.synchronizer = self
+        self.local.peer = remote
+        self.remote.synchronizer = self
+        self.remote.peer = local
         if self.dry_run:
             self.local.readonly = True
             self.local.dry_run = True
@@ -138,6 +146,7 @@ class BaseSynchronizer(object):
 
 #         dest.set_mtime(file_entry.name, file_entry.mtime, file_entry.size)
         dest.set_mtime(file_entry.name, file_entry.get_adjusted_mtime(), file_entry.size)
+        dest.set_sync_info(file_entry.name, file_entry.get_adjusted_mtime(), file_entry.size)
 
         elap = time.time() - start
         self._inc_stat("write_time", elap)
@@ -334,7 +343,7 @@ class BaseSynchronizer(object):
         
         # 4. Let the target provider write its meta data for the files in the 
         #    current directory.
-        self.local.cur_dir_meta.set_last_sync(self.remote)
+#         self.local.cur_dir_meta.set_last_sync(self.remote)
         self.local.flush_meta()
         self.remote.flush_meta()
 
@@ -421,14 +430,23 @@ class BiDirSynchronizer(BaseSynchronizer):
         super(BiDirSynchronizer, self).__init__(local, remote, options)
 
     def _diff(self, local_file, remote_file):
-        print("    Local : %s: %s (native: %s)" % (local_file, local_file.get_adjusted_mtime(), local_file.mtime))
-        print("    Remote: %s: %s (native: %s)" % (remote_file, remote_file.get_adjusted_mtime(), remote_file.mtime))
-        print("    last sync: %s" % (self.local.cur_dir_meta.get_last_sync(self.remote)))
+        print("    Local : %s: %s (native: %s)" % (local_file, local_file.get_adjusted_mtime(), 
+            _ts(local_file.mtime)))
+        print("          : last sync %s" 
+              % (local_file.get_sync_info()))
+        print("    Remote: %s: %s (native: %s)" % (remote_file, remote_file.get_adjusted_mtime(), 
+            _ts(remote_file.mtime)))
+        print("          : last sync %s" 
+              % (remote_file.get_sync_info()))
+#         print("    last sync: %s" % _ts(self.local.cur_dir_meta.get_last_sync()))
 
     def sync_newer_local_file(self, local_file, remote_file):
+        is_conflict = remote_file.was_modified_since_last_sync()
         if not self._test_match_or_print(local_file):
             return
-        if not self._test_match_or_print(local_file):
+        if is_conflict:
+            self._log_action("skip", "conflict", ">!", local_file, min_level=2)
+            self._diff(local_file, remote_file)
             return
         self._log_action("copy", "modified", ">", local_file)
         self._diff(local_file, remote_file)
@@ -436,6 +454,11 @@ class BiDirSynchronizer(BaseSynchronizer):
 
     def sync_older_local_file(self, local_file, remote_file):
         if self._test_match_or_print(local_file):
+            is_conflict = local_file.was_modified_since_last_sync()
+            if is_conflict:
+                self._log_action("skip", "conflict", "<!", remote_file, min_level=2)
+                self._diff(local_file, remote_file)
+                return
             self._log_action("copy", "modified", "<", remote_file)
             self._diff(local_file, remote_file)
             self._copy_file(self.remote, self.local, remote_file)

@@ -28,10 +28,17 @@ EDIT FILES @ 03-07-2014 12:00 & SYNC >>
 
 SYNC >>
 
-                                        a.txt  01-07-2014 12:00             a.txt  01-07-2014 12:00   
+                                        a.txt  01-07-2014 12:00             a.txt  01-07-2014 12:00
                                         b.txt  01-07-2014 12:00            *b.txt  03-07-2014 12:00    DOWNLOAD
                                        *c.txt  03-07-2014 12:00             c.txt  01-07-2014 12:00    UPLOAD
                                        *d.txt  03-07-2014 12:00            *d.txt  03-07-2014 12:00    ?? Conflict
                                        *e.txt  03-07-2014 12:00                                        UPLOAD
                                                                            *f.txt  03-07-2014 12:00    DOWNLOAD
+```
+
+### Console Output
+```
+Local              Synchronize     Remote
+/Users/martin                      ftp://ftp.wwwendt.de/test/
+    COPY MISSING         <           folder_1/folder_1_1/myfile.doc       
 ```

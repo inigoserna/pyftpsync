@@ -1,5 +1,5 @@
 # pyftpsync [![Build Status](https://travis-ci.org/mar10/pyftpsync.png?branch=master)](https://travis-ci.org/mar10/pyftpsync) [![Latest Version](https://pypip.in/v/pyftpsync/badge.png)](https://pypi.python.org/pypi/pyftpsync/) [![Downloads](https://pypip.in/d/pyftpsync/badge.png)](https://pypi.python.org/pypi/pyftpsync/) [![License](https://pypip.in/license/pyftpsync/badge.png)](https://pypi.python.org/pypi/pyftpsync/)
-Copyright (c) 2012-2014 Martin Wendt
+Copyright (c) 2012-2015 Martin Wendt
 
 Synchronize local directories with FTP server.
 
@@ -14,10 +14,8 @@ Synchronize local directories with FTP server.
 
   * This is a command line tool...
   *  ... and a library for use in your Python projects
-  * upload mode
-  * download mode
-  * TODO: bidirectional sync mode
-  * Allows FTP-to-FTP and Filesystem-to-Filesystem synchronisation as well
+  * Upload, download, and bi-directional synch mode
+  * Allows FTP-to-FTP and Filesystem-to-Filesystem synchronization as well
   * Architecture is open to add other target types.
 
 Note: 

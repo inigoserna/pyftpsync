@@ -1,8 +1,8 @@
 # -*- coding: iso-8859-1 -*-
 """
-Simple folder synchronisation using FTP.
+Simple folder synchronization using FTP.
 
-(c) 2012-2014 Martin Wendt; see https://github.com/mar10/pyftpsync
+(c) 2012-2015 Martin Wendt; see https://github.com/mar10/pyftpsync
 Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
 
 Usage examples:
@@ -215,6 +215,7 @@ def run():
         s = BiDirSynchronizer(args.local_target, args.remote_target, opts)
     else:
         parser.error("unknown command %s" % args.command)
+    
     s.run()
 
     stats = s.get_stats()

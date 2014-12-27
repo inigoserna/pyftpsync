@@ -1,6 +1,6 @@
 # -*- coding: iso-8859-1 -*-
 """
-(c) 2012-2014 Martin Wendt; see https://github.com/mar10/pyftpsync
+(c) 2012-2015 Martin Wendt; see https://github.com/mar10/pyftpsync
 Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
 """
 
@@ -36,6 +36,9 @@ def get_stored_credentials(filename, url):
     
     URL = user:password
     """
+    # TODO: 
+    # We should support configuring by host or URL prefix.
+    # (Exact URLs still override common settings) 
     home_path = os.path.expanduser("~")
     file_path = os.path.join(home_path, filename)
     if os.path.isfile(file_path):
@@ -135,12 +138,17 @@ class DirMetadata(object):
     
     META_FILE_NAME = "_pyftpsync-meta.json"
 #     SNAPSHOT_FILE_NAME = "_pyftpsync-snap-%(remote)s.json"
-    VERBOSE = True # Reduce meta file size to 35% (3759 -> 1375 bytes)
+    VERBOSE = True # False: Reduce meta file size to 35% (3759 -> 1375 bytes)
+    VERSION = 1
     
     def __init__(self, target):
         self.target = target
+        self.path = target.cur_dir
         self.list = {}
-        self.dir = {"files": self.list}
+        self.peer_sync = {}
+        self.dir = {"files": self.list,
+                    "peer_sync": self.peer_sync,
+                    }
         self.filename = self.META_FILE_NAME
         self.modified_list = False
         self.modified_sync = False
@@ -148,48 +156,68 @@ class DirMetadata(object):
         self.was_read = False
         
     def set_mtime(self, filename, mtime, size):
-        self.list[filename] = {#"name": filename,
+        """Store real file mtime in meta data.
+        
+        This is needed, because FTP targets don't allow to set file mtime, but 
+        use to the upload time instead.
+        We also record size and upload time, so we can detect if the file was
+        changed by other means and we have to discard our meta data.
+        """
+        ut = time.time()  # UTC time stamp
+        self.list[filename] = {"mtime": mtime,
                                "size": size,
-#                                "uploaded": time.mktime(time.gmtime()),
-                               "uploaded": time.time(), # UTC time stamp
-                               "mtime": mtime}
+                               "uploaded": ut,
+                               }
         if self.VERBOSE:
             self.list[filename].update({
-                "uploaded_str": time.ctime(),
                 "mtime_str": time.ctime(mtime),
+                "uploaded_str": time.ctime(ut),
                 })
         self.modified_list = True
     
-    def set_last_sync(self, peer_target):
-        """Store time when this target was last synced with remote."""
-        ls = self.dir.setdefault("last_sync", {})
-        ls[peer_target.get_id()] = {"sync": time.time(), "sync_str": time.ctime()}
+    def set_sync_info(self, filename, mtime, size):
+        """Store mtime/size when local and remote file was last synchronized.
+        
+        This is stored in the local file's folder as meta data.
+        The information is used to detect conflicts, i.e. if both source and
+        remote had been modified by other means since last synchronization.
+        """
+        assert self.target.is_local()
+        remote_target = self.target.peer
+        ps = self.dir["peer_sync"].setdefault(remote_target.get_id(), {})
+        pse = ps[filename] = {"mtime": mtime, 
+                              "size": size,
+                              }
+        if self.VERBOSE:
+            pse["mtime_str"] = time.ctime(mtime)
         self.modified_sync = True
         
-    def get_last_sync(self, peer_target):
-        """."""
-        try:
-            return self.dir["last_sync"][peer_target.get_id()]["sync"]
-        except KeyError:
-            return None
+#     def get_last_sync_with(self, peer_target):
+#         """."""
+#         try:
+#             return self.dir["last_sync"][peer_target.get_id()]["sync"]
+#         except KeyError:
+#             return None
         
     def remove(self, filename):
-        self.list.pop(filename, None)
-        self.modified_list = True
+        if self.list.pop(filename, None):
+            self.modified_list = True
 
-    def match_filename(self, filename):
-        return filename == self.filename
-    
-    @staticmethod
-    def is_meta_filename(filename):
-        return filename.startswith("_pyftpsync-") and filename.endswith(".json")
+#     def match_filename(self, filename):
+#         return filename == self.filename
+#     
+#     @staticmethod
+#     def is_meta_filename(filename):
+#         return filename.startswith("_pyftpsync-") and filename.endswith(".json")
     
     def read(self):
+        assert self.path == self.target.cur_dir
         try:
             s = self.target.read_text(self.filename)
             self.was_read = True # True, if exists (even invalid)
             self.dir = json.loads(s)
             self.list = self.dir["files"]
+            self.peer_sync = self.dir["peer_sync"]
             self.modified_list = False
             self.modified_sync = False
 #              print("DirMetadata: read(%s)" % (self.filename, ), self.dir)
@@ -201,16 +229,21 @@ class DirMetadata(object):
 #         if self.target.readonly:
 #             print("DirMetadata.flush(%s): read-only; nothing to do" % self.target)
 #             return
+        assert self.path == self.target.cur_dir
         if self.target.dry_run:
             print("DirMetadata.flush(%s): dry-run; nothing to do" % self.target)
-            return
-#        print("DirMetadata.flush(%s), %s" % (self.filename, self.target))
-        if len(self.list) > 0 or self.modified_sync:
-            if not self.modified_list and not self.modified_sync:
-                print("DirMetadata.flush(%s): unmodified; nothing to do" % self.target)
-                return
+        
+        elif self.was_read and len(self.list) == 0 and len(self.peer_sync) == 0:
+            print("DirMetadata.flush(%s): DELETE" % self.target)
+            self.target.remove_file(self.filename)
+
+        elif not self.modified_list and not self.modified_sync:
+            print("DirMetadata.flush(%s): unmodified; nothing to do" % self.target)
+
+        else:        
             self.dir["_disclaimer"] = "Generated by https://github.com/mar10/pyftpsync"
             self.dir["_time_str"] = "%s" % time.ctime()
+            self.dir["_file_version"] = self.VERSION
             self.dir["_version"] = __version__
             self.dir["_time"] = time.mktime(time.gmtime())
             if self.VERBOSE:
@@ -219,11 +252,7 @@ class DirMetadata(object):
                 s = json.dumps(self.dir)
             print("DirMetadata.flush(%s)" % (self.target, ))#, s)
             self.target.write_text(self.filename, s)
-        elif self.was_read:
-            print("DirMetadata.flush(%s): DELETE" % self.target)
-            self.target.remove_file(self.filename)
-        else:
-            print("DirMetadata.flush(%s): nothing to do" % self.target)
+#            print("DirMetadata.flush(%s), %s" % (self.filename, self.target))
 
         self.modified_list = False
         self.modified_sync = False
@@ -251,7 +280,7 @@ class _Resource(object):
         self.mtime = mtime 
         self.dt_modified = datetime.fromtimestamp(self.mtime)
         self.unique = unique
-        self.meta = None
+        self.meta = None # Set by target.get_dir()
 
     def __str__(self):
         return "%s('%s', size:%s, modified:%s)" % (self.__class__.__name__, 
@@ -269,6 +298,15 @@ class _Resource(object):
     
     def is_dir(self):
         return False
+
+    def is_local(self):
+        return self.target.is_local()
+
+    def get_sync_info(self):
+        raise NotImplementedError
+
+    def set_sync_info(self, local_file):
+        raise NotImplementedError
 
 
 #===============================================================================
@@ -290,6 +328,9 @@ class FileEntry(_Resource):
             return -1
         return 1
         
+    def is_file(self):
+        return True
+
     def __eq__(self, other):
 #        if other.get_adjusted_mtime() == self.get_adjusted_mtime() and other.mtime != self.mtime:
 #            print("*** Adjusted time match", self, other)
@@ -304,17 +345,41 @@ class FileEntry(_Resource):
                 and other.name == self.name 
                 and time_greater)
 
+#     def set_sync_info(self):
+#         """Store mtime/size when this resource was last synchronized with remote."""
+#         assert self.is_local()
+#         return self.cur_dir_meta.set_sync_info(self)
+
+    def get_sync_info(self):
+        """Get mtime/size when this resource was last synchronized with remote."""
+        info = self.target.get_sync_info()
+        return info.get(self.name) if info else None
+
     def get_adjusted_mtime(self):
+        """Return modification time as stored in metadata (else system mtime)."""
         try:
             res = float(self.meta["mtime"])
 #            print("META: %s reporting %s instead of %s" % (self.name, time.ctime(res), time.ctime(self.mtime)))
             return res
-        except Exception:
+        except TypeError:
             return self.mtime
         
-    def is_file(self):
-        return True
-
+    def was_modified_since_last_sync(self):
+        """Return True if this resource was modified since last sync.
+        
+        None is returned if we don't know (because of missing meta data).
+        """
+        info = self.get_sync_info()
+        if not info:
+            return None
+        if self.size != info["size"]:
+            return True
+        if self.get_adjusted_mtime() > info["mtime"]:
+            return True
+#         if res:
+#             print("%s was_modified_since_last_sync: %s" % (self, (self.get_adjusted_mtime() - self.target.cur_dir_meta.get_last_sync_with(peer_target))))
+        return False
+        
 
 #===============================================================================
 # DirectoryEntry
@@ -337,7 +402,9 @@ class _Target(object):
         self.dry_run = False
         self.host = None
         self.root_dir = root_dir.rstrip("/")
+        self.synchronizer = None # Set by BaseSynchronizer.__init__()
         self.cur_dir = None
+        self.peer = None
         self.connected = False
         self.save_mode = True
         self.case_sensitive = None # TODO: don't know yet
@@ -348,7 +415,10 @@ class _Target(object):
         
     def __del__(self):
         self.close()
-        
+
+    def is_local(self):
+        return self.synchronizer.local is self
+          
     def open(self):
         self.connected = True
     
@@ -362,6 +432,15 @@ class _Target(object):
 
     def get_id(self):
         return self.root_dir
+
+    def get_sync_info(self):
+        """Get mtime/size when this target's current dir was last synchronized with remote."""
+        peer_target = self.peer
+        if self.is_local():
+            info = self.cur_dir_meta.dir["peer_sync"].get(peer_target.get_id())
+        else:
+            info = peer_target.cur_dir_meta.dir["peer_sync"].get(self.get_id())
+        return info
 
     def cwd(self, dir_name):
         raise NotImplementedError
@@ -423,6 +502,8 @@ class _Target(object):
     def set_mtime(self, name, mtime, size):
         raise NotImplementedError
 
+    def set_sync_info(self, name, mtime, size):
+        raise NotImplementedError
 
 #===============================================================================
 # FsTarget
@@ -529,5 +610,13 @@ class FsTarget(_Target):
         os.remove(path)
 
     def set_mtime(self, name, mtime, size):
+        """Set modification time on file."""
         self.check_write(name)
         os.utime(os.path.join(self.cur_dir, name), (-1, mtime))
+
+    def set_sync_info(self, name, mtime, size):
+        """Store mtime/size when this resource was last synchronized with remote."""
+#         assert self.is_local()
+        if not self.is_local():
+            return self.peer.set_sync_info(name, mtime, size)
+        return self.cur_dir_meta.set_sync_info(name, mtime, size)

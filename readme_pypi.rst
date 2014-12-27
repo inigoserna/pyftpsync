@@ -1,4 +1,4 @@
-Copyright (c) 2012-2014 Martin Wendt
+Copyright (c) 2012-2015 Martin Wendt
 
 Status
 ------
@@ -10,9 +10,7 @@ Synchronize local directories with FTP server.
 
   * This is a command line tool...
   *  ... and a library for use in your Python projects
-  * upload mode
-  * download mode
-  * TODO: bidirectional sync mode
+  * Upload, download, and bi-directional synch mode
   * Allows FTP-to-FTP and Filesystem-to-Filesystem synchronisation as well
   * Architecture is open to add other target types.
 

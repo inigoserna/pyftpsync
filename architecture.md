@@ -35,10 +35,3 @@ SYNC >>
                                        *e.txt  03-07-2014 12:00                                        UPLOAD
                                                                            *f.txt  03-07-2014 12:00    DOWNLOAD
 ```
-
-### Console Output
-```
-Local              Synchronize     Remote
-/Users/martin                      ftp://ftp.wwwendt.de/test/
-    COPY MISSING         <           folder_1/folder_1_1/myfile.doc       
-```

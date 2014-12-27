@@ -34,6 +34,9 @@ class FtpTarget(_Target):
     def __str__(self):
         return "<ftp:%s%s + %s>" % (self.host, self.root_dir, relpath_url(self.cur_dir, self.root_dir))
 
+    def get_base_name(self):
+        return "ftp:%s%s" % (self.host, self.root_dir)
+
     def open(self):
         self.ftp.connect(self.host)
         if self.username:

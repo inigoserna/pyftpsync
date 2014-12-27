@@ -9,7 +9,7 @@ from __future__ import print_function
 from datetime import datetime
 import io
 import os
-from posixpath import join as join_url, normpath as normurl
+from posixpath import join as join_url, normpath as normpath_url, relpath as relpath_url
 import shutil
 import sys
 import json
@@ -192,24 +192,13 @@ class DirMetadata(object):
             pse["mtime_str"] = time.ctime(mtime)
         self.modified_sync = True
         
-#     def get_last_sync_with(self, peer_target):
-#         """."""
-#         try:
-#             return self.dir["last_sync"][peer_target.get_id()]["sync"]
-#         except KeyError:
-#             return None
-        
     def remove(self, filename):
         if self.list.pop(filename, None):
             self.modified_list = True
+        assert self.target.is_local()
+        remote_target = self.target.peer
+        self.modified_sync = self.dir["peer_sync"][remote_target.get_id()].pop(filename, None)
 
-#     def match_filename(self, filename):
-#         return filename == self.filename
-#     
-#     @staticmethod
-#     def is_meta_filename(filename):
-#         return filename.startswith("_pyftpsync-") and filename.endswith(".json")
-    
     def read(self):
         assert self.path == self.target.cur_dir
         try:
@@ -217,7 +206,7 @@ class DirMetadata(object):
             self.was_read = True # True, if exists (even invalid)
             self.dir = json.loads(s)
             self.list = self.dir["files"]
-            self.peer_sync = self.dir["peer_sync"]
+            self.peer_sync = self.dir.get("peer_sync") 
             self.modified_list = False
             self.modified_sync = False
 #              print("DirMetadata: read(%s)" % (self.filename, ), self.dir)
@@ -291,7 +280,8 @@ class _Resource(object):
         raise NotImplementedError
 
     def get_rel_path(self):
-        return normurl(join_url(self.rel_path, self.name))
+        path = relpath_url(self.target.cur_dir, self.target.root_dir)
+        return normpath_url(join_url(path, self.name))
     
     def is_file(self):
         return False
@@ -352,8 +342,7 @@ class FileEntry(_Resource):
 
     def get_sync_info(self):
         """Get mtime/size when this resource was last synchronized with remote."""
-        info = self.target.get_sync_info()
-        return info.get(self.name) if info else None
+        return self.target.get_sync_info(self.name)
 
     def get_adjusted_mtime(self):
         """Return modification time as stored in metadata (else system mtime)."""
@@ -403,8 +392,8 @@ class _Target(object):
         self.host = None
         self.root_dir = root_dir.rstrip("/")
         self.synchronizer = None # Set by BaseSynchronizer.__init__()
-        self.cur_dir = None
         self.peer = None
+        self.cur_dir = None
         self.connected = False
         self.save_mode = True
         self.case_sensitive = None # TODO: don't know yet
@@ -415,6 +404,9 @@ class _Target(object):
         
     def __del__(self):
         self.close()
+
+    def get_base_name(self):
+        return "%s" % self.root_dir
 
     def is_local(self):
         return self.synchronizer.local is self
@@ -433,13 +425,15 @@ class _Target(object):
     def get_id(self):
         return self.root_dir
 
-    def get_sync_info(self):
+    def get_sync_info(self, name):
         """Get mtime/size when this target's current dir was last synchronized with remote."""
         peer_target = self.peer
         if self.is_local():
             info = self.cur_dir_meta.dir["peer_sync"].get(peer_target.get_id())
         else:
             info = peer_target.cur_dir_meta.dir["peer_sync"].get(self.get_id())
+        if name is not None:
+            info = info.get(name) if info else None
         return info
 
     def cwd(self, dir_name):
@@ -503,7 +497,16 @@ class _Target(object):
         raise NotImplementedError
 
     def set_sync_info(self, name, mtime, size):
-        raise NotImplementedError
+        """Store mtime/size when this resource was last synchronized with remote."""
+        if not self.is_local():
+            return self.peer.set_sync_info(name, mtime, size)
+        return self.cur_dir_meta.set_sync_info(name, mtime, size)
+
+    def remove_sync_info(self, name):
+        if not self.is_local():
+            return self.peer.remove_sync_info(name)
+        return self.cur_dir_meta.remove(name)
+
 
 #===============================================================================
 # FsTarget
@@ -528,7 +531,7 @@ class FsTarget(_Target):
         self.connected = False
         
     def cwd(self, dir_name):
-        path = normurl(join_url(self.cur_dir, dir_name))
+        path = normpath_url(join_url(self.cur_dir, dir_name))
         if not path.startswith(self.root_dir):
             raise RuntimeError("Tried to navigate outside root %r: %r" % (self.root_dir, path))
         self.cur_dir_meta = None
@@ -540,13 +543,13 @@ class FsTarget(_Target):
 
     def mkdir(self, dir_name):
         self.check_write(dir_name)
-        path = normurl(join_url(self.cur_dir, dir_name))
+        path = normpath_url(join_url(self.cur_dir, dir_name))
         os.mkdir(path)
 
     def rmdir(self, dir_name):
         """Remove cur_dir/name."""
         self.check_write(dir_name)
-        path = normurl(join_url(self.cur_dir, dir_name))
+        path = normpath_url(join_url(self.cur_dir, dir_name))
 #         print("REMOVE %r" % path)
         shutil.rmtree(path)
 
@@ -613,10 +616,3 @@ class FsTarget(_Target):
         """Set modification time on file."""
         self.check_write(name)
         os.utime(os.path.join(self.cur_dir, name), (-1, mtime))
-
-    def set_sync_info(self, name, mtime, size):
-        """Store mtime/size when this resource was last synchronized with remote."""
-#         assert self.is_local()
-        if not self.is_local():
-            return self.peer.set_sync_info(name, mtime, size)
-        return self.cur_dir_meta.set_sync_info(name, mtime, size)

@@ -101,6 +101,12 @@ class BaseSynchronizer(object):
     def run(self):
         start = time.time()
         
+#         print("{:<33} {:<11} {:<33}".format(self.local.get_base_name(), 
+#                                             self.get_name().capitalize(), 
+#                                             self.remote.get_base_name()))
+        print("{} {}\n                with {}".format(self.get_name().capitalize(),
+                                                      self.local.get_base_name(), 
+                                                      self.remote.get_base_name()))
         res = self._sync_dir()
         
         stats = self._stats
@@ -201,6 +207,7 @@ class BaseSynchronizer(object):
         elif file_entry.target.readonly:
             raise RuntimeError("target is read-only: %s" % file_entry.target)
         file_entry.target.remove_file(file_entry.name)
+        file_entry.target.remove_sync_info(file_entry.name)
 
     def _remove_dir(self, dir_entry):
         # TODO: honor backup
@@ -230,7 +237,8 @@ class BaseSynchronizer(object):
         name = entry.get_rel_path()
         if entry.is_dir():
             name = "[%s]" % name
-        print("%s%-16s %-2s %s" % (prefix, tag, symbol, name))
+#         print("%s%-16s %-2s %s" % (prefix, tag, symbol, name))
+        print("{}{:<16} {:^3} {}".format(prefix, tag, symbol, name))
         
     def _dry_run_action(self, action):
         """"Called in dry-run mode after call to _log_action() and before exiting function."""
@@ -343,7 +351,6 @@ class BaseSynchronizer(object):
         
         # 4. Let the target provider write its meta data for the files in the 
         #    current directory.
-#         self.local.cur_dir_meta.set_last_sync(self.remote)
         self.local.flush_meta()
         self.remote.flush_meta()
 
@@ -415,10 +422,10 @@ class BiDirSynchronizer(BaseSynchronizer):
     
     - When both files are newer than last sync -> conflict!
       Conflicts may be resolved by these options
-        --merge-newest: use the newer version
-        --merge-local:  use the local file
-        --merge-remote: use the remote file
-        --merge-ask:    interactive mode
+        --resolve-newest:      use the newer version
+        --resolve-local:       use the local file
+        --resolve-remote:      use the remote file
+        --resolve-interactive: prompt mode
         
     - When a file is missing: check if it existed in the past.
       If so, delete it. Otherwise copy it.
@@ -429,16 +436,20 @@ class BiDirSynchronizer(BaseSynchronizer):
     def __init__(self, local, remote, options):
         super(BiDirSynchronizer, self).__init__(local, remote, options)
 
+    def get_name(self):
+        return "synchronize"
+
     def _diff(self, local_file, remote_file):
-        print("    Local : %s: %s (native: %s)" % (local_file, local_file.get_adjusted_mtime(), 
-            _ts(local_file.mtime)))
-        print("          : last sync %s" 
-              % (local_file.get_sync_info()))
-        print("    Remote: %s: %s (native: %s)" % (remote_file, remote_file.get_adjusted_mtime(), 
-            _ts(remote_file.mtime)))
-        print("          : last sync %s" 
-              % (remote_file.get_sync_info()))
-#         print("    last sync: %s" % _ts(self.local.cur_dir_meta.get_last_sync()))
+#         print("    Local : %s: %s (native: %s)" % (local_file, local_file.get_adjusted_mtime(), 
+#             _ts(local_file.mtime)))
+#         print("          : last sync %s" 
+#               % (local_file.get_sync_info()))
+#         print("    Remote: %s: %s (native: %s)" % (remote_file, remote_file.get_adjusted_mtime(), 
+#             _ts(remote_file.mtime)))
+#         print("          : last sync %s" 
+#               % (remote_file.get_sync_info()))
+# #         print("    last sync: %s" % _ts(self.local.cur_dir_meta.get_last_sync()))
+        pass
 
     def sync_newer_local_file(self, local_file, remote_file):
         is_conflict = remote_file.was_modified_since_last_sync()
@@ -465,6 +476,11 @@ class BiDirSynchronizer(BaseSynchronizer):
 
     def sync_missing_local_file(self, remote_file):
         if self._test_match_or_print(remote_file):
+            existed = self.local.get_sync_info(remote_file.name)
+            if existed:
+                self._log_action("delete", "removed", "<X", remote_file)
+                self._remove_file(remote_file)
+                return
             self._log_action("copy", "new", "<", remote_file)
             self._copy_file(self.remote, self.local, remote_file)
 
@@ -475,6 +491,11 @@ class BiDirSynchronizer(BaseSynchronizer):
     
     def sync_missing_remote_file(self, local_file):
         if self._test_match_or_print(local_file):
+            existed = local_file.get_sync_info()
+            if existed:
+                self._log_action("delete", "removed", "X<", local_file)
+                self._remove_file(local_file)
+                return
             self._log_action("copy", "new", ">", local_file)
             self._copy_file(self.local, self.remote, local_file)
      
@@ -494,6 +515,9 @@ class UploadSynchronizer(BaseSynchronizer):
         super(UploadSynchronizer, self).__init__(local, remote, options)
         local.readonly = True
 
+    def get_name(self):
+        return "upload"
+    
     def _check_del_unmatched(self, remote_entry):
         """Return True if entry is NOT matched (i.e. excluded by filter).
         
@@ -582,6 +606,9 @@ class DownloadSynchronizer(BaseSynchronizer):
     def __init__(self, local, remote, options):
         super(DownloadSynchronizer, self).__init__(local, remote, options)
         remote.readonly = True
+
+    def get_name(self):
+        return "download"
 
     def _check_del_unmatched(self, local_entry):
         """Return True if entry is NOT matched (i.e. excluded by filter).

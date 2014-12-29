@@ -11,8 +11,8 @@ import sys
 import time
 from datetime import datetime
 
-from ftpsync.targets import FileEntry, DirectoryEntry, IS_REDIRECTED, \
-    DRY_RUN_PREFIX, DirMetadata
+from ftpsync.targets import IS_REDIRECTED, DRY_RUN_PREFIX, DirMetadata
+from ftpsync.resources import FileEntry, DirectoryEntry
 
 def _ts(timestamp):
     return "{} ({})".format(datetime.fromtimestamp(timestamp), timestamp)
@@ -56,20 +56,25 @@ class BaseSynchronizer(object):
             self.remote.readonly = True
             self.remote.dry_run = True
         
-        self._stats = {"local_files": 0,
-                       "local_dirs": 0,
-                       "remote_files": 0,
-                       "remote_dirs": 0,
+        self._stats = {"bytes_written": 0,
+                       "conflict_files": 0,
+                       "dirs_created": 0,
+                       "dirs_deleted": 0,
+                       "download_bytes_written": 0,
+                       "download_files_written": 0,
+                       "elap_secs": None,
+                       "elap_str": None,
+                       "entries_seen": 0,
+                       "entries_touched": 0,
                        "files_created": 0,
                        "files_deleted": 0,
                        "files_written": 0,
-                       "dirs_written": 0,
-                       "dirs_deleted": 0,
-                       "bytes_written": 0,
-                       "entries_seen": 0,
-                       "entries_touched": 0,
-                       "elap_str": None,
-                       "elap_secs": None,
+                       "local_dirs": 0,
+                       "local_files": 0,
+                       "remote_dirs": 0,
+                       "remote_files": 0,
+                       "upload_bytes_written": 0,
+                       "upload_files_written": 0,
                        }
     
     def get_stats(self):
@@ -102,10 +107,12 @@ class BaseSynchronizer(object):
         start = time.time()
         
 #         print("{:<33} {:<11} {:<33}".format(self.local.get_base_name(), 
-#                                             self.get_name().capitalize(), 
+#                                             self.get_info_strings().capitalize(), 
 #                                             self.remote.get_base_name()))
-        print("{} {}\n                with {}".format(self.get_name().capitalize(),
-                                                      self.local.get_base_name(), 
+        info_strings = self.get_info_strings()
+        print("{} {}\n{:>20} {}".format(info_strings[0].capitalize(),
+                                                      self.local.get_base_name(),
+                                                      info_strings[1], 
                                                       self.remote.get_base_name()))
         res = self._sync_dir()
         
@@ -131,13 +138,17 @@ class BaseSynchronizer(object):
         assert isinstance(file_entry, FileEntry)
         self._inc_stat("files_written")
         self._inc_stat("entries_touched")
+        is_upload = (dest is self.remote)
+        if is_upload:
+            self._inc_stat("upload_files_written")
+        else:
+            self._inc_stat("download_files_written")
         self._tick()
         if self.dry_run:
             return self._dry_run_action("copy file (%s, %s --> %s)" % (file_entry, src, dest))
         elif dest.readonly:
             raise RuntimeError("target is read-only: %s" % dest)
 
-        is_upload = (dest is self.remote)
         start = time.time()
         def __block_written(data):
 #            print(">(%s), " % len(data))
@@ -166,13 +177,15 @@ class BaseSynchronizer(object):
 #        print("_copy_recursive(%s, %s --> %s)" % (dir_entry, src, dest))
         assert isinstance(dir_entry, DirectoryEntry)
         self._inc_stat("entries_touched")
-        self._inc_stat("dirs_written")
+        self._inc_stat("dirs_created")
         self._tick()
         if self.dry_run:
             return self._dry_run_action("copy directory (%s, %s --> %s)" % (dir_entry, src, dest))
         elif dest.readonly:
             raise RuntimeError("target is read-only: %s" % dest)
         
+        dest.set_sync_info(dir_entry.name, None, None)
+
         src.push_meta()
         dest.push_meta()
         
@@ -187,8 +200,10 @@ class BaseSynchronizer(object):
                 self._copy_recursive(src, dest, entry)
             else:
                 self._copy_file(src, dest, entry)
+
         src.flush_meta()
         dest.flush_meta()
+    
         src.cwd("..")
         dest.cwd("..")
         
@@ -219,6 +234,7 @@ class BaseSynchronizer(object):
         elif dir_entry.target.readonly:
             raise RuntimeError("target is read-only: %s" % dir_entry.target)
         dir_entry.target.rmdir(dir_entry.name)
+        dir_entry.target.remove_sync_info(dir_entry.name)
 
     def _log_call(self, msg, min_level=5):
         if self.verbose >= min_level: 
@@ -237,7 +253,6 @@ class BaseSynchronizer(object):
         name = entry.get_rel_path()
         if entry.is_dir():
             name = "[%s]" % name
-#         print("%s%-16s %-2s %s" % (prefix, tag, symbol, name))
         print("{}{:<16} {:^3} {}".format(prefix, tag, symbol, name))
         
     def _dry_run_action(self, action):
@@ -436,8 +451,8 @@ class BiDirSynchronizer(BaseSynchronizer):
     def __init__(self, local, remote, options):
         super(BiDirSynchronizer, self).__init__(local, remote, options)
 
-    def get_name(self):
-        return "synchronize"
+    def get_info_strings(self):
+        return ("synchronize", "with")
 
     def _diff(self, local_file, remote_file):
 #         print("    Local : %s: %s (native: %s)" % (local_file, local_file.get_adjusted_mtime(), 
@@ -456,6 +471,7 @@ class BiDirSynchronizer(BaseSynchronizer):
         if not self._test_match_or_print(local_file):
             return
         if is_conflict:
+            self._inc_stat("conflict_files")
             self._log_action("skip", "conflict", ">!", local_file, min_level=2)
             self._diff(local_file, remote_file)
             return
@@ -467,6 +483,7 @@ class BiDirSynchronizer(BaseSynchronizer):
         if self._test_match_or_print(local_file):
             is_conflict = local_file.was_modified_since_last_sync()
             if is_conflict:
+                self._inc_stat("conflict_files")
                 self._log_action("skip", "conflict", "<!", remote_file, min_level=2)
                 self._diff(local_file, remote_file)
                 return
@@ -486,6 +503,11 @@ class BiDirSynchronizer(BaseSynchronizer):
 
     def sync_missing_local_dir(self, remote_dir):
         if self._test_match_or_print(remote_dir):
+            existed = self.local.get_sync_info(remote_dir.name)
+            if existed:
+                self._log_action("delete", "removed", "<X", remote_dir)
+                self._remove_dir(remote_dir)
+                return
             self._log_action("copy", "new", "<", remote_dir)
             self._copy_recursive(self.remote, self.local, remote_dir)
     
@@ -501,6 +523,11 @@ class BiDirSynchronizer(BaseSynchronizer):
      
     def sync_missing_remote_dir(self, local_dir):
         if self._test_match_or_print(local_dir):
+            existed = self.local.get_sync_info(local_dir.name)
+            if existed:
+                self._log_action("delete", "removed", "<X", local_dir)
+                self._remove_file(local_dir)
+                return
             self._log_action("copy", "new", ">", local_dir)
             self._copy_recursive(self.local, self.remote, local_dir)
 
@@ -515,8 +542,8 @@ class UploadSynchronizer(BaseSynchronizer):
         super(UploadSynchronizer, self).__init__(local, remote, options)
         local.readonly = True
 
-    def get_name(self):
-        return "upload"
+    def get_info_strings(self):
+        return ("upload", "to")
     
     def _check_del_unmatched(self, remote_entry):
         """Return True if entry is NOT matched (i.e. excluded by filter).
@@ -607,8 +634,8 @@ class DownloadSynchronizer(BaseSynchronizer):
         super(DownloadSynchronizer, self).__init__(local, remote, options)
         remote.readonly = True
 
-    def get_name(self):
-        return "download"
+    def get_info_strings(self):
+        return ("download", "from")
 
     def _check_del_unmatched(self, local_entry):
         """Return True if entry is NOT matched (i.e. excluded by filter).

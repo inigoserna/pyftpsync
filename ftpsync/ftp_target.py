@@ -12,7 +12,8 @@ from posixpath import join as join_url, normpath as normpath_url, relpath as rel
 import sys
 import time
 
-from ftpsync.targets import FileEntry, DirectoryEntry, _Target, DirMetadata
+from ftpsync.targets import _Target, DirMetadata
+from ftpsync.resources import DirectoryEntry, FileEntry
 
 
 #===============================================================================
@@ -77,7 +78,7 @@ class FtpTarget(_Target):
         self.check_write(dir_name)
         self.ftp.mkd(dir_name)
 
-    def rmdir(self, dir_name):
+    def _rmdir_impl(self, dir_name, keep_root=False):
         # FTP does not support deletion of non-empty directories.
 #        print("rmdir(%s)" % dir_name)
         self.check_write(dir_name)
@@ -97,9 +98,16 @@ class FtpTarget(_Target):
                         # assume <name> is a folder
                         self.rmdir(name)
             finally:
-                self.ftp.cwd("..")
+                if dir_name != ".":
+                    self.ftp.cwd("..")
 #        print("ftp.rmd(%s)..." % (dir_name, ))
-        self.ftp.rmd(dir_name)
+        if not keep_root:
+            self.ftp.rmd(dir_name)
+        return
+
+    
+    def rmdir(self, dir_name):
+        return self._rmdir_impl(dir_name)
 
 
     def get_dir(self):
@@ -183,7 +191,7 @@ class FtpTarget(_Target):
 #                        print("META: Removing outdated meta entry %s" % n, meta)
                         missing.append(n)
                 else:
-                    print("META: Removing missing meta entry %s" % n)
+#                     print("META: Removing missing meta entry %s" % n)
                     missing.append(n)
             # Remove missing files from cur_dir_meta 
             for n in missing:
@@ -207,12 +215,13 @@ class FtpTarget(_Target):
     def remove_file(self, name):
         """Remove cur_dir/name."""
         self.check_write(name)
-        self.cur_dir_meta.remove(name)
+#         self.cur_dir_meta.remove(name)
         self.ftp.delete(name)
+        self.remove_sync_info(name)
 
     def set_mtime(self, name, mtime, size):
         self.check_write(name)
-        print("META set_mtime(%s): %s" % (name, time.ctime(mtime)))
+#         print("META set_mtime(%s): %s" % (name, time.ctime(mtime)))
         # We cannot set the mtime on FTP servers, so we store this as additional
         # meta data in the same directory
         # TODO: try "SITE UTIME", "MDTM (set version)", or "SRFT" command

@@ -53,7 +53,7 @@ class BaseSynchronizer(object):
                        "files_created": 0,
                        "files_deleted": 0,
                        "files_written": 0,
-                       "dirs_written": 0,
+                       "dirs_created": 0,
                        "dirs_deleted": 0,
                        "bytes_written": 0,
                        "entries_seen": 0,
@@ -148,7 +148,7 @@ class BaseSynchronizer(object):
 #        print("_copy_recursive(%s, %s --> %s)" % (dir_entry, src, dest))
         assert isinstance(dir_entry, DirectoryEntry)
         self._inc_stat("entries_touched")
-        self._inc_stat("dirs_written")
+        self._inc_stat("dirs_created")
         self._tick()
         if self.dry_run:
             return self._dry_run_action("copy directory (%s, %s --> %s)" % (dir_entry, src, dest))

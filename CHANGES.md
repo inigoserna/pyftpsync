@@ -5,7 +5,8 @@ CHANGES
 0.3.0
 =====
 - BiDirSynchronizer
-- Detect conflicts if both targets are modified since last sync
+- Detect conflicts if both targets are modified since last sync.
+- Distinguish whether a resource was added on local or removed on remote.
 
 0.2.1
 =====

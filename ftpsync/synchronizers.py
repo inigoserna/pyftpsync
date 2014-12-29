@@ -253,7 +253,7 @@ class BaseSynchronizer(object):
         name = entry.get_rel_path()
         if entry.is_dir():
             name = "[%s]" % name
-        print("{}{:<16} {:^3} {}".format(prefix, tag, symbol, name))
+        print("{0}{1:<16} {2:^3} {3}".format(prefix, tag, symbol, name))
         
     def _dry_run_action(self, action):
         """"Called in dry-run mode after call to _log_action() and before exiting function."""

@@ -94,7 +94,7 @@ def prepare_test_folder():
     # Reset all
     _empty_folder(PYFTPSYNC_TEST_FOLDER)
     # Add some files to ../temp1/
-    dt = datetime.datetime(2014, 01, 01, 12, 00, 00)
+    dt = datetime.datetime(2014, 1, 1, 12, 0, 0)
     _write_test_file("temp1/file1.txt", content="111", dt=dt)
     _write_test_file("temp1/file2.txt", content="222", dt=dt)
     _write_test_file("temp1/file3.txt", content="333", dt=dt)

@@ -110,7 +110,7 @@ class BaseSynchronizer(object):
 #                                             self.get_info_strings().capitalize(), 
 #                                             self.remote.get_base_name()))
         info_strings = self.get_info_strings()
-        print("{} {}\n{:>20} {}".format(info_strings[0].capitalize(),
+        print("{0} {1}\n{2:>20} {3}".format(info_strings[0].capitalize(),
                                                       self.local.get_base_name(),
                                                       info_strings[1], 
                                                       self.remote.get_base_name()))

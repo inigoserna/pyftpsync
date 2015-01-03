@@ -17,7 +17,7 @@ from ftpsync._version import __version__
 from ftpsync.targets import make_target, FsTarget
 
 from ftpsync.synchronizers import UploadSynchronizer, \
-    DownloadSynchronizer, BiDirSynchronizer
+    DownloadSynchronizer, BiDirSynchronizer, DEFAULT_OMIT
 
 
 #def disable_stdout_buffering():
@@ -163,9 +163,9 @@ def run():
     sync_parser.add_argument("remote", 
                              metavar="REMOTE",
                              help="path to remote folder")
-    sync_parser.add_argument("--force", 
-                             action="store_true",
-                             help="overwrite conflicted files with newer version")
+#     sync_parser.add_argument("--force", 
+#                              action="store_true",
+#                              help="overwrite conflicted files with newer version")
 #     sync_parser.add_argument("--delete", 
 #                              action="store_true",
 #                              help="remove local files if they don't exist on remote target")
@@ -182,12 +182,15 @@ def run():
                              help="wildcard for file names (default: all, "
                              "separate multiple values with ',')")
     sync_parser.add_argument("-o", "--omit", 
+#                             nargs="?",
+#                             default=",".join(DEFAULT_OMIT),
                              help="wildcard of files and directories to exclude (applied after --include)")
     sync_parser.set_defaults(command="synchronize")
     
     # Parse command line
     args = parser.parse_args()
-    
+#    print("args %s %s" % (args.omit, args))
+#    return
     # Post-process and check arguments
     args.verbose -= args.quiet
     del args.quiet

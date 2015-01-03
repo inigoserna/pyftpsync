@@ -140,7 +140,7 @@ class DirMetadata(object):
     META_FILE_NAME = "_pyftpsync-meta.json"
 #     SNAPSHOT_FILE_NAME = "_pyftpsync-snap-%(remote)s.json"
     PRETTY = True # False: Reduce meta file size to 35% (3759 -> 1375 bytes)
-    VERSION = 1
+    VERSION = 1 # Increment if format changes. Old files will be discarded then.
     
     def __init__(self, target):
         self.target = target
@@ -205,6 +205,7 @@ class DirMetadata(object):
         assert self.path == self.target.cur_dir
         try:
             s = self.target.read_text(self.filename)
+            self.target.synchronizer._inc_stat("meta_bytes_read", len(s))
             self.was_read = True # True, if exists (even invalid)
             self.dir = json.loads(s)
             if self.dir.get("_file_version", 0) < self.VERSION:
@@ -247,6 +248,7 @@ class DirMetadata(object):
                 s = json.dumps(self.dir)
 #             print("DirMetadata.flush(%s)" % (self.target, ))#, s)
             self.target.write_text(self.filename, s)
+            self.target.synchronizer._inc_stat("meta_bytes_written", len(s))
 
         self.modified_list = False
         self.modified_sync = False

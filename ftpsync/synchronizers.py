@@ -11,11 +11,19 @@ import sys
 import time
 from datetime import datetime
 
+import colorama
 from ftpsync.targets import IS_REDIRECTED, DRY_RUN_PREFIX, DirMetadata
 from ftpsync.resources import FileEntry, DirectoryEntry
 
 def _ts(timestamp):
     return "{} ({})".format(datetime.fromtimestamp(timestamp), timestamp)
+
+DEFAULT_OMIT = [".DS_Store",
+                ".git",
+                ".hg",
+                ".svn",
+                DirMetadata.META_FILE_NAME,
+                ]
 
 
 #===============================================================================
@@ -23,12 +31,6 @@ def _ts(timestamp):
 #===============================================================================
 class BaseSynchronizer(object):
     """Synchronizes two target instances in dry_run mode (also base class for other synchronizers)."""
-    DEFAULT_EXCLUDES = [".DS_Store",
-                        ".git",
-                        ".hg",
-                        ".svn",
-                        DirMetadata.META_FILE_NAME,
-                        ]
 
     def __init__(self, local, remote, options):
         self.local = local
@@ -71,11 +73,14 @@ class BaseSynchronizer(object):
                        "files_written": 0,
                        "local_dirs": 0,
                        "local_files": 0,
+                       "meta_bytes_read": 0,
+                       "meta_bytes_written": 0,
                        "remote_dirs": 0,
                        "remote_files": 0,
                        "upload_bytes_written": 0,
                        "upload_files_written": 0,
                        }
+        colorama.init()
     
     def get_stats(self):
         return self._stats
@@ -87,7 +92,7 @@ class BaseSynchronizer(object):
         name = entry.name
         if name == DirMetadata.META_FILE_NAME:
             return False
-#        if name in self.DEFAULT_EXCLUDES:
+#        if name in self.DEFAULT_OMIT:
 #            return False
         ok = True
         if entry.is_file() and self.include_files:
@@ -240,9 +245,24 @@ class BaseSynchronizer(object):
         if self.verbose >= min_level: 
             print(msg)
         
+    COLOR_MAP = {#("skip", "*"): colorama.Fore.WHITE + colorama.Style.DIM,
+                 #("*", "equal"): colorama.Fore.WHITE + colorama.Style.DIM,
+                 ("delete", "*"): colorama.Fore.RED,
+                 ("*", "modified"): colorama.Fore.BLUE,
+                 ("restore", "*"): colorama.Fore.BLUE,
+                 ("copy", "new"): colorama.Fore.GREEN,
+                 }
+    
     def _log_action(self, action, status, symbol, entry, min_level=3):
         if self.verbose < min_level:
             return
+        CM = self.COLOR_MAP
+        color = CM.get((action, status), 
+                       CM.get(("*", status), 
+                              CM.get((action, "*"), 
+                                     "")))
+        final = colorama.Style.RESET_ALL
+
         prefix = "" 
         if self.dry_run:
             prefix = DRY_RUN_PREFIX
@@ -253,8 +273,22 @@ class BaseSynchronizer(object):
         name = entry.get_rel_path()
         if entry.is_dir():
             name = "[%s]" % name
-        print("{0}{1:<16} {2:^3} {3}".format(prefix, tag, symbol, name))
+
+#         print("{0}{1:<16} {2:^3} {3}".format(prefix, tag, symbol, name))
+        print("{0}{1}{2:<16} {3:^3} {4}{5}".format(prefix, color, tag, symbol, name, final))
         
+    def _tick(self):
+        """Write progress info and move cursor to beginning of line."""
+        if (self.verbose >= 3 and not IS_REDIRECTED) or self.options.get("progress"):
+            stats = self.get_stats()
+            prefix = DRY_RUN_PREFIX if self.dry_run else ""
+            sys.stdout.write("%sTouched %s/%s entries in %s dirs...\r"
+                % (prefix,
+                   stats["entries_touched"], stats["entries_seen"], 
+                   stats["local_dirs"]))
+        sys.stdout.flush()
+        return
+    
     def _dry_run_action(self, action):
         """"Called in dry-run mode after call to _log_action() and before exiting function."""
 #        print("dry-run", action)
@@ -266,18 +300,6 @@ class BaseSynchronizer(object):
             self._log_action("skip", "unmatched", "-", entry, min_level=4)
             return False
         return True
-    
-    def _tick(self):
-        """Write progress info and move cursor to beginning of line."""
-        if (self.verbose >= 3 and not IS_REDIRECTED) or self.options.get("progress"):
-            stats = self.get_stats()
-            prefix = DRY_RUN_PREFIX if self.dry_run else ""
-            sys.stdout.write("%sTouched %s/%s entries in %s dirs...\r" 
-                % (prefix,
-                   stats["entries_touched"], stats["entries_seen"], 
-                   stats["local_dirs"]))
-        sys.stdout.flush()
-        return
     
     def _before_sync(self, entry):
         """Called by the synchronizer for each entry. 

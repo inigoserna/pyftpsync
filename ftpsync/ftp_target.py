@@ -12,9 +12,11 @@ from posixpath import join as join_url, normpath as normpath_url, relpath as rel
 import sys
 import time
 
+from ftpsync import targets
 from ftpsync.targets import _Target, DirMetadata
 from ftpsync.resources import DirectoryEntry, FileEntry
 
+DEFAULT_BLOCKSIZE = targets.DEFAULT_BLOCKSIZE
 
 #===============================================================================
 # FtpTarget
@@ -207,7 +209,7 @@ class FtpTarget(_Target):
         out.seek(0)
         return out
 
-    def write_file(self, name, fp_src, blocksize=8192, callback=None):
+    def write_file(self, name, fp_src, blocksize=DEFAULT_BLOCKSIZE, callback=None):
         self.check_write(name)
         self.ftp.storbinary("STOR %s" % name, fp_src, blocksize, callback)
         # TODO: check result

@@ -2,6 +2,8 @@
 """
 Tests for pyftpsync
 """
+from __future__ import print_function
+
 from ftplib import FTP
 from pprint import pprint
 from unittest import TestCase
@@ -10,37 +12,19 @@ import unittest
 from ftpsync.ftp_target import *  # @UnusedWildImport
 from ftpsync.targets import *  # @UnusedWildImport
 
-from ftpsync.synchronizers import DownloadSynchronizer, UploadSynchronizer,\
+from ftpsync.synchronizers import DownloadSynchronizer, UploadSynchronizer, \
     BiDirSynchronizer
-from test.test_flow import prepare_test_folder, PYFTPSYNC_TEST_FTP_URL,\
-    PYFTPSYNC_TEST_FOLDER, _get_test_file_date, STAMP_20140101_120000,\
-    _set_test_file_date
+from test.test_flow import prepare_test_folder, PYFTPSYNC_TEST_FTP_URL, \
+    PYFTPSYNC_TEST_FOLDER, _get_test_file_date, STAMP_20140101_120000, \
+    _set_test_file_date, _empty_folder, _write_test_file
 
-#from ftpsync.targets import *  # @UnusedWildImport
-#from ftpsync.ftp_target import *  # @UnusedWildImport
-#from ftplib import FTP
-
+DO_BENCHMARKS = True
 
 #===============================================================================
 # Module setUp / tearDown
 #===============================================================================
-
-
 def setUpModule():
     pass
-#     ftp_url = os.environ.get("PYFTPSYNC_TEST_FTP_URL")
-#     if ftp_url is None or True:
-#         raise RuntimeError("Must configure a FTP target (environment variable PYFTPSYNC_TEST_FTP_URL)")
-#     parts = urlparse(ftp_url, allow_fragments=False)
-#     if parts.scheme.lower() !="ftp":
-#         raise RuntimeError("Must configure a FTP target (environment variable PYFTPSYNC_TEST_FTP_URL)")
-#     print(parts)
-# #     self.creds = parts.username, parts.password
-# #     self.host = parts.netloc.split("@", 1)[1]
-#     print(parts.netloc)
-#     global 
-#     FTP_TARGET = parts
-
 
 def tearDownModule():
     pass
@@ -54,19 +38,13 @@ class FtpTest(TestCase):
     def setUp(self):
         # Remote URL, e.g. "ftp://user:password@example.com/my/test/folder"
         ftp_url = PYFTPSYNC_TEST_FTP_URL
-        self.assertTrue(ftp_url, "Must configure a FTP target (environment variable PYFTPSYNC_TEST_FTP_URL)")
+        if not ftp_url:
+            self.skipTest("Must configure a FTP target (environment variable PYFTPSYNC_TEST_FTP_URL)")
+
         parts = urlparse(ftp_url, allow_fragments=False)
         self.assertEqual(parts.scheme.lower(), "ftp")
-#        print(parts)
-#        self.creds = parts.username, parts.password
         host = parts.netloc.split("@", 1)[1]
-#         self.HOST = parts.netloc.split("@", 1)[1]
         self.PATH = parts.path
-#        print(parts.netloc)
-#         if not parts.username:
-#             sc = get_stored_credentials(DEFAULT_CREDENTIAL_STORE, parts.netloc)
-#             if sc:
-#                 creds = sc
         self.ftp = FTP()
 #        self.ftp.debug(1) 
         self.ftp.connect(host)
@@ -110,7 +88,8 @@ class FtpTargetTest(TestCase):
     def setUp(self):
         # Remote URL, e.g. "ftp://user:password@example.com/my/test/folder"
         ftp_url = PYFTPSYNC_TEST_FTP_URL
-        self.assertTrue(ftp_url, "Must configure a FTP target (environment variable PYFTPSYNC_TEST_FTP_URL)")
+        if not ftp_url:
+            self.skipTest("Must configure a FTP target (environment variable PYFTPSYNC_TEST_FTP_URL)")
         self.assertTrue("/test" in ftp_url or "/temp" in ftp_url, "FTP target path must include '/test' or '/temp'")
 
         # Create local /temp1 folder with files and empty /temp2 folder
@@ -204,6 +183,9 @@ class FtpTargetTest(TestCase):
     def test_sync_fs_ftp(self):
         local = FsTarget(os.path.join(PYFTPSYNC_TEST_FOLDER, "temp1"))
         remote = self.remote
+        
+        # Upload all of /temp1 to remote
+        
         opts = {"force": False, "delete": True, "verbose": 3, "dry_run": False}
         s = UploadSynchronizer(local, remote, opts)
         s.run()
@@ -219,7 +201,7 @@ class FtpTargetTest(TestCase):
         self.assertEqual(stats["dirs_created"], 2)
         self.assertEqual(stats["bytes_written"], 16403)
         
-        # Change one file
+        # Change one file and upload again
         
         _set_test_file_date("temp1/file1.txt")
 
@@ -240,7 +222,8 @@ class FtpTargetTest(TestCase):
         self.assertEqual(stats["conflict_files"], 0)
         self.assertEqual(stats["bytes_written"], 3)
         
-        # Download from remote to temp2
+        # Download all from remote to /temp2
+        
         local = FsTarget(os.path.join(PYFTPSYNC_TEST_FOLDER, "temp2"))
 
         opts = {"force": False, "delete": True, "verbose": 3, "dry_run": False}
@@ -268,7 +251,7 @@ class FtpTargetTest(TestCase):
         self.assertEqual(_get_test_file_date("temp1/file2.txt"), STAMP_20140101_120000)
         self.assertEqual(_get_test_file_date("temp2/file2.txt"), STAMP_20140101_120000)
 
-        # Synchronize /temp1 <=> remote 
+        # Synchronize /temp1 <=> remote : nothing to do
         
         local = FsTarget(os.path.join(PYFTPSYNC_TEST_FOLDER, "temp1"))
 
@@ -281,6 +264,91 @@ class FtpTargetTest(TestCase):
         self.assertEqual(stats["conflict_files"], 0)
         self.assertEqual(stats["bytes_written"], 0)
 
+        # Synchronize /temp2 <=> remote : nothing to do
+        
+        local = FsTarget(os.path.join(PYFTPSYNC_TEST_FOLDER, "temp2"))
+
+        opts = {"verbose": 3, "dry_run": False}
+        s = BiDirSynchronizer(local, remote, opts)
+        s.run()
+        stats = s.get_stats()
+        pprint(stats)
+        self.assertEqual(stats["entries_touched"], 0)
+        self.assertEqual(stats["conflict_files"], 0)
+        self.assertEqual(stats["bytes_written"], 0)
+
+
+#===============================================================================
+# BenchmarkTest
+#===============================================================================
+class BenchmarkTest(TestCase):                          
+    """Test ftp_target.FtpTarget functionality."""
+    def setUp(self):
+        if not DO_BENCHMARKS:
+            self.skipTest("DO_BENCHMARKS is not set")
+        # Remote URL, e.g. "ftp://user:password@example.com/my/test/folder"
+        ftp_url = PYFTPSYNC_TEST_FTP_URL
+        if not ftp_url:
+            self.skipTest("Must configure a FTP target (environment variable PYFTPSYNC_TEST_FTP_URL)")
+        self.assertTrue("/test" in ftp_url or "/temp" in ftp_url, "FTP target path must include '/test' or '/temp'")
+
+        # Create local /temp1 folder with files and empty /temp2 folder
+        prepare_test_folder()
+
+        self.remote = make_target(ftp_url)
+        # Delete all files in remote target folder
+        self.remote._rmdir_impl(".", keep_root=True)
+
+    def tearDown(self):
+        self.remote.close()
+        del self.remote
+
+    def _transfer_files(self, count, size):
+        temp1_path = os.path.join(PYFTPSYNC_TEST_FOLDER, "temp1")
+        _empty_folder(temp1_path) # remove standard test files 
+
+        local = FsTarget(temp1_path)
+        remote = self.remote
+        
+        for i in range(count):
+            _write_test_file("temp1/file_%s.txt" % i, size=size)
+
+        # Upload all of /temp1 to remote
+        
+        opts = {"force": False, "delete": False, "verbose": 3, "dry_run": False}
+        s = UploadSynchronizer(local, remote, opts)
+        s.run()
+        stats = s.get_stats()
+#        pprint(stats)
+
+        self.assertEqual(stats["files_written"], count)
+        self.assertEqual(stats["bytes_written"], count * size)
+#        pprint(stats)
+        print("Upload %s x %s bytes took %s: %s" % (count, size, stats["upload_write_time"], stats["upload_rate_str"]), file=sys.stderr)
+
+        # Download all of remote to /temp2
+        
+        local = FsTarget(os.path.join(PYFTPSYNC_TEST_FOLDER, "temp2"))
+
+        opts = {"force": False, "delete": True, "verbose": 3, "dry_run": False}
+        s = DownloadSynchronizer(local, remote, opts)
+        s.run()
+        stats = s.get_stats()
+#        pprint(stats)
+
+        self.assertEqual(stats["files_written"], count)
+        self.assertEqual(stats["bytes_written"], count * size)
+
+#        pprint(stats)
+        print("Download %s x %s bytes took %s: %s" % (count, size, stats["download_write_time"], stats["download_rate_str"]), file=sys.stderr)
+
+    def test_transfer_small_files(self):
+        """Transfer 20 KiB in many small files."""
+        self._transfer_files(count=10, size=2*1024)
+
+    def test_transfer_large_files(self):
+        """Transfer 20 KiB in one large file."""
+        self._transfer_files(count=1, size=20*1024)
 
 #===============================================================================
 # PlainTest

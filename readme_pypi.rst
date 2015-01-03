@@ -9,7 +9,7 @@ Summary
 Synchronize local directories with FTP server.
 
   * This is a command line tool...
-  *  ... and a library for use in your Python projects
+  * ... and a library for use in your Python projects
   * Upload, download, and bi-directional synch mode
   * Allows FTP-to-FTP and Filesystem-to-Filesystem synchronisation as well
   * Architecture is open to add other target types.

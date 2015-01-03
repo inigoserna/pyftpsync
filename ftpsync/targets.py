@@ -28,7 +28,8 @@ except ImportError:
 DEFAULT_CREDENTIAL_STORE = "pyftpsync.pw"
 DRY_RUN_PREFIX = "(DRY-RUN) "
 IS_REDIRECTED = (os.fstat(0) != os.fstat(1))
-
+DEFAULT_BLOCKSIZE = 8 * 1024
+# DEFAULT_BLOCKSIZE = 32 * 1024
 
 
 def get_stored_credentials(filename, url):
@@ -195,9 +196,10 @@ class DirMetadata(object):
     def remove(self, filename):
         if self.list.pop(filename, None):
             self.modified_list = True
-        assert self.target.is_local()
-        remote_target = self.target.peer
-        self.modified_sync = self.dir["peer_sync"][remote_target.get_id()].pop(filename, None)
+        if self.target.is_local():
+            remote_target = self.target.peer
+            self.modified_sync = self.dir["peer_sync"][remote_target.get_id()].pop(filename, None)
+        return
 
     def read(self):
         assert self.path == self.target.cur_dir
@@ -463,7 +465,7 @@ class FsTarget(_Target):
         fp = open(os.path.join(self.cur_dir, name), "rb")
         return fp
         
-    def write_file(self, name, fp_src, blocksize=8192, callback=None):
+    def write_file(self, name, fp_src, blocksize=DEFAULT_BLOCKSIZE, callback=None):
         self.check_write(name)
         with open(os.path.join(self.cur_dir, name), "wb") as fp_dst:
             while True:

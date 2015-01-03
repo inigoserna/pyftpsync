@@ -4,7 +4,7 @@ Copyright (c) 2012-2015 Martin Wendt
 Synchronize local directories with FTP server.
 
 ## Status
-*This project has beta status: (under development) use at your own risk!*
+*This project has beta status: use at your own risk!*
 
 Please submit bugs as you find them.
 
@@ -13,18 +13,18 @@ Please submit bugs as you find them.
 Synchronize local directories with FTP server.
 
   * This is a command line tool...
-  *  ... and a library for use in your Python projects
+  * ... and a library for use in your Python projects
   * Upload, download, and bi-directional synch mode
   * Allows FTP-to-FTP and Filesystem-to-Filesystem synchronization as well
   * Architecture is open to add other target types.
 
 Note: 
-The FTP server must support the [MLST command] (http://tools.ietf.org/html/rfc3659).
+The FTP server must support the [MLST command](http://tools.ietf.org/html/rfc3659).
 
 ## Usage 
 *Preconditions:* [Python](http://www.python.org/download/ Python) 2.6+ or 3 is required, 
-[pip] (http://www.pip-installer.org/) or
-[EasyInstall] (http://pypi.python.org/pypi/setuptools#using-setuptools-and-easyinstall)
+[pip](http://www.pip-installer.org/) or
+[EasyInstall](http://pypi.python.org/pypi/setuptools#using-setuptools-and-easyinstall)
 recommended. 
 
 Install like this:

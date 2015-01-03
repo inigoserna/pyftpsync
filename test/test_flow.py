@@ -2,6 +2,10 @@
 """
 Tests for pyftpsync
 """
+from __future__ import print_function
+
+import calendar
+import datetime
 import os
 from pprint import pprint
 import shutil
@@ -12,10 +16,8 @@ import unittest
 
 from ftpsync.targets import FsTarget
 
-from ftpsync.synchronizers import DownloadSynchronizer, UploadSynchronizer,\
+from ftpsync.synchronizers import DownloadSynchronizer, UploadSynchronizer, \
     BiDirSynchronizer
-import datetime
-import calendar
 
 
 PYFTPSYNC_TEST_FOLDER = os.environ.get("PYFTPSYNC_TEST_FOLDER") or tempfile.mkdtemp()
@@ -88,7 +90,7 @@ def _empty_folder(folder_path):
 STAMP_20140101_120000 = 1388577600.0  # Wed, 01 Jan 2014 12:00:00 GMT
 
 def prepare_test_folder():
-    """Create """
+    """Create two test folders and some files."""
     print("prepare_test_folder", PYFTPSYNC_TEST_FOLDER)
     assert os.path.isdir(PYFTPSYNC_TEST_FOLDER)
     # Reset all

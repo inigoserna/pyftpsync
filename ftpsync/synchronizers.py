@@ -22,7 +22,7 @@ def _ts(timestamp):
 # BaseSynchronizer
 #===============================================================================
 class BaseSynchronizer(object):
-    """Synchronizes two target instances in dry_run mode (also base class for other synchonizers)."""
+    """Synchronizes two target instances in dry_run mode (also base class for other synchronizers)."""
     DEFAULT_EXCLUDES = [".DS_Store",
                         ".git",
                         ".hg",

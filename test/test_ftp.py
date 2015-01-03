@@ -18,7 +18,7 @@ from test.test_flow import prepare_test_folder, PYFTPSYNC_TEST_FTP_URL, \
     PYFTPSYNC_TEST_FOLDER, _get_test_file_date, STAMP_20140101_120000, \
     _set_test_file_date, _empty_folder, _write_test_file
 
-DO_BENCHMARKS = True
+DO_BENCHMARKS = False #True
 
 #===============================================================================
 # Module setUp / tearDown

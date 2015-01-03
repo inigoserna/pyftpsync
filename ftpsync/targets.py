@@ -13,6 +13,7 @@ import shutil
 import sys
 import json
 import time
+import getpass
 from ftpsync._version import __version__
 from ftpsync.resources import DirectoryEntry, FileEntry
 
@@ -36,7 +37,10 @@ def get_stored_credentials(filename, url):
     """Parse a file in the user's home directory, formatted like:
     
     URL = user:password
+
+    @returns 2-tuple (username, password) or None
     """
+    creds = None
     # TODO: 
     # We should support configuring by host or URL prefix.
     # (Exact URLs still override common settings) 
@@ -53,6 +57,17 @@ def get_stored_credentials(filename, url):
                     continue
                 creds = creds.strip()
                 return creds.split(":", 1)
+    # Prompt
+    user = None
+    default_user = getpass.getuser()
+    while user is None:
+        user = raw_input("Enter username for ftp://%s [%s]: " % (url, default_user))
+        if user == "" and default_user:
+            user = default_user
+    if user:
+        pw = getpass.getpass("Enter password for ftp://%s@%s: " % (user, url))
+        if pw:
+            return (user, pw)
     return None
 
 

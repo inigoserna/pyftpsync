@@ -24,6 +24,18 @@ except ImportError:
     # Python 2
     from urlparse import urlparse
 
+try:
+    import colorama  # provide color codes, ...
+    colorama.init()  # improve color handling on windows terminals
+except ImportError:
+    print("Unable to import 'colorama' library: Colored output may be affected.")
+    colorama = None
+
+try:
+    import keyring
+except ImportError:
+    print("Unable to import 'keyring' library: Storage of passwords is not available.")
+    keyring = None
 
 
 DEFAULT_CREDENTIAL_STORE = "pyftpsync.pw"
@@ -33,37 +45,17 @@ DEFAULT_BLOCKSIZE = 8 * 1024
 # DEFAULT_BLOCKSIZE = 32 * 1024
 
 
-def get_stored_credentials(filename, url):
-    """Parse a file in the user's home directory, formatted like:
-    
-    URL = user:password
+#===============================================================================
+# 
+#===============================================================================
 
-    @returns 2-tuple (username, password) or None
-    """
-    creds = None
-    # TODO: 
-    # We should support configuring by host or URL prefix.
-    # (Exact URLs still override common settings) 
-    home_path = os.path.expanduser("~")
-    file_path = os.path.join(home_path, filename)
-    if os.path.isfile(file_path):
-        with open(file_path, "rt") as f:
-            for line in f:
-                line = line.strip()
-                if not "=" in line or line.startswith("#") or line.startswith(";"):
-                    continue
-                u, creds = line.split("=", 1)
-                if not creds or u.strip().lower() != url:
-                    continue
-                creds = creds.strip()
-                return creds.split(":", 1)
-    # Prompt
-    user = None
-    default_user = getpass.getuser()
-    while user is None:
-        user = raw_input("Enter username for ftp://%s [%s]: " % (url, default_user))
-        if user == "" and default_user:
-            user = default_user
+def prompt_for_password(url, user=None):
+    if user is None:
+        default_user = getpass.getuser()
+        while user is None:
+            user = raw_input("Enter username for ftp://%s [%s]: " % (url, default_user))
+            if user.strip() == "" and default_user:
+                user = default_user
     if user:
         pw = getpass.getpass("Enter password for ftp://%s@%s: " % (user, url))
         if pw:
@@ -71,26 +63,91 @@ def get_stored_credentials(filename, url):
     return None
 
 
+def get_credentials_for_url(url, allow_prompt):
+    """
+    @returns 2-tuple (username, password) or None
+    """
+    creds = None
+    
+    # Lookup our own credential store
+    # Parse a file in the user's home directory, formatted like:
+    # URL = user:password
+    home_path = os.path.expanduser("~")
+    file_path = os.path.join(home_path, DEFAULT_CREDENTIAL_STORE)
+    if os.path.isfile(file_path):
+        with open(file_path, "rt") as f:
+            for line in f:
+                line = line.strip()
+                if not "=" in line or line.startswith("#") or line.startswith(";"):
+                    continue
+                u, c = line.split("=", 1)
+                if not c or u.strip().lower() != url:
+                    continue
+                c = c.strip()
+                creds = c.split(":", 1)
+    
+    # Query 
+    if creds is None and keyring:
+        try:
+            # Note: we pass the url as `username` and username:password as `password`
+            c = keyring.get_password("pyftpsync", url)
+            if c is not None:
+                creds = c.split(":", 1)
+#                print(creds)
+                print("Using credentials from keyring('pyftpsync', '%s'): %s:***)" % (url, creds[0]))
+        except keyring.errors.TransientKeyringError:
+            pass # e.g. user clicked 'no' 
+
+    # Prompt
+    if creds is None and allow_prompt:
+        creds = prompt_for_password(url)
+    
+    return creds
+
+
+def save_password(url, username, password):
+    if keyring:
+        if ":" in username:
+            raise RuntimeError("Unable to store credentials if username contains a ':' (%s)" % username)
+
+        try:
+            # Note: we pass the url as `username` and username:password as `password`
+            if password is None:
+                keyring.delete_password("pyftpsync", url)
+                print("delete_password(%s)" % url)
+            else:
+                keyring.set_password("pyftpsync", url, "%s:%s" % (username, password))
+                print("save_password(%s, %s:***)" % (url, username))
+        except keyring.errors.TransientKeyringError:
+            pass # e.g. user clicked 'no'
+    else:
+        print("Could not store password (missing keyring library)")
+    return
+
+
+def ansi_code(name):
+    """Return ansi color or style codes or '' if colorama is not available."""
+    try:
+        return getattr(colorama, name)
+    except AttributeError:
+        return ""
 
 
 #===============================================================================
 # make_target
 #===============================================================================
-def make_target(url, connect=True, debug=1, allow_stored_credentials=True):
-    """Factory that creates _Target obejcts from URLs."""
+def make_target(url, extra_opts=None):
+    """Factory that creates _Target objects from URLs."""
+#    debug = extra_opts.get("debug", 1)
     parts = urlparse(url, allow_fragments=False)
     # scheme is case-insensitive according to http://tools.ietf.org/html/rfc3986
     if parts.scheme.lower() == "ftp":
         creds = parts.username, parts.password
-        if not parts.username and allow_stored_credentials:
-            sc = get_stored_credentials(DEFAULT_CREDENTIAL_STORE, parts.netloc)
-            if sc:
-                creds = sc
         from ftpsync import ftp_target
         target = ftp_target.FtpTarget(parts.path, parts.hostname, 
-                                      creds[0], creds[1], connect, debug)
+                                      creds[0], creds[1], extra_opts)
     else:
-        target = FsTarget(url)
+        target = FsTarget(url, extra_opts)
 
     return target
 
@@ -274,11 +331,12 @@ class DirMetadata(object):
 #===============================================================================
 class _Target(object):
 
-    def __init__(self, root_dir):
+    def __init__(self, root_dir, extra_opts):
+        self.root_dir = root_dir.rstrip("/")
+        self.extra_opts = extra_opts or {}
         self.readonly = False
         self.dry_run = False
         self.host = None
-        self.root_dir = root_dir.rstrip("/")
         self.synchronizer = None # Set by BaseSynchronizer.__init__()
         self.peer = None
         self.cur_dir = None
@@ -298,6 +356,12 @@ class _Target(object):
 
     def is_local(self):
         return self.synchronizer.local is self
+    
+    def get_option(self, key, default=None):
+        """Return option from synchronizer (possibly overridden by target extra_opts)."""
+        if self.synchronizer:
+            return self.extra_opts.get(key, self.synchronizer.options.get(key, default))
+        return self.extra_opts.get(key, default)
           
     def open(self):
         self.connected = True
@@ -400,12 +464,12 @@ class _Target(object):
 # FsTarget
 #===============================================================================
 class FsTarget(_Target):
-    def __init__(self, root_dir):
+    def __init__(self, root_dir, extra_opts=None):
         root_dir = os.path.expanduser(root_dir)
         root_dir = os.path.abspath(root_dir)
         if not os.path.isdir(root_dir):
             raise ValueError("%s is not a directory" % root_dir)
-        super(FsTarget, self).__init__(root_dir)
+        super(FsTarget, self).__init__(root_dir, extra_opts)
         self.open()
 
     def __str__(self):

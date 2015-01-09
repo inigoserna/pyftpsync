@@ -14,7 +14,7 @@ from ftpsync.targets import *  # @UnusedWildImport
 
 from ftpsync.synchronizers import DownloadSynchronizer, UploadSynchronizer, \
     BiDirSynchronizer
-from test.test_flow import prepare_test_folder, PYFTPSYNC_TEST_FTP_URL, \
+from test.test_flow import prepare_fixtures, PYFTPSYNC_TEST_FTP_URL, \
     PYFTPSYNC_TEST_FOLDER, _get_test_file_date, STAMP_20140101_120000, \
     _set_test_file_date, _empty_folder, _write_test_file
 
@@ -93,7 +93,7 @@ class FtpTargetTest(TestCase):
         self.assertTrue("/test" in ftp_url or "/temp" in ftp_url, "FTP target path must include '/test' or '/temp'")
 
         # Create local /temp1 folder with files and empty /temp2 folder
-        prepare_test_folder()
+        prepare_fixtures()
 
 #        print(ftp_url)
         
@@ -106,6 +106,7 @@ class FtpTargetTest(TestCase):
 #        user, passwd = get_stored_credentials("pyftpsync.pw", self.HOST)
 
         self.remote = make_target(ftp_url)
+        self.remote.open()
         # This check is already preformed in the constructor:
 #        self.assertEqual(self.remote.pwd(), self.PATH)
 
@@ -293,9 +294,10 @@ class BenchmarkTest(TestCase):
         self.assertTrue("/test" in ftp_url or "/temp" in ftp_url, "FTP target path must include '/test' or '/temp'")
 
         # Create local /temp1 folder with files and empty /temp2 folder
-        prepare_test_folder()
+        prepare_fixtures()
 
         self.remote = make_target(ftp_url)
+        self.remote.open()
         # Delete all files in remote target folder
         self.remote._rmdir_impl(".", keep_root=True)
 
@@ -363,24 +365,24 @@ class PlainTest(TestCase):
         pass
 
     def test_make_target(self):
-        t = make_target("ftp://ftp.example.com/target/folder", connect=False)
+        t = make_target("ftp://ftp.example.com/target/folder")
         self.assertTrue(isinstance(t, FtpTarget))
         self.assertEqual(t.host, "ftp.example.com")
         self.assertEqual(t.root_dir, "/target/folder")
         self.assertEqual(t.username, None)
         # scheme is case-insensitive
-        t = make_target("FTP://ftp.example.com/target/folder", connect=False)
+        t = make_target("FTP://ftp.example.com/target/folder")
         self.assertTrue(isinstance(t, FtpTarget))
         
         # pass credentials wit URL
-        t = make_target("ftp://user:secret@ftp.example.com/target/folder", connect=False)
+        t = make_target("ftp://user:secret@ftp.example.com/target/folder")
         self.assertTrue(isinstance(t, FtpTarget))
         self.assertEqual(t.host, "ftp.example.com")
         self.assertEqual(t.username, "user")
         self.assertEqual(t.password, "secret")
         self.assertEqual(t.root_dir, "/target/folder")
 
-        t = make_target("ftp://www.user.com:secret@ftp.example.com/target/folder", connect=False)
+        t = make_target("ftp://www.user.com:secret@ftp.example.com/target/folder")
         self.assertTrue(isinstance(t, FtpTarget))
         self.assertEqual(t.username, "www.user.com")
         self.assertEqual(t.password, "secret")

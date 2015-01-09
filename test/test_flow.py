@@ -84,14 +84,14 @@ def _empty_folder(folder_path):
 
 
 #===============================================================================
-# prepare_test_folder
+# prepare_fixtures
 #===============================================================================
 
 STAMP_20140101_120000 = 1388577600.0  # Wed, 01 Jan 2014 12:00:00 GMT
 
-def prepare_test_folder():
+def prepare_fixtures():
     """Create two test folders and some files."""
-    print("prepare_test_folder", PYFTPSYNC_TEST_FOLDER)
+    print("prepare_fixtures", PYFTPSYNC_TEST_FOLDER)
     assert os.path.isdir(PYFTPSYNC_TEST_FOLDER)
     # Reset all
     _empty_folder(PYFTPSYNC_TEST_FOLDER)
@@ -111,7 +111,7 @@ def prepare_test_folder():
 # Module setUp / tearDown
 #===============================================================================
 def setUpModule():
-#    prepare_test_folder()
+#    prepare_fixtures()
     pass
 
 def tearDownModule():
@@ -125,7 +125,7 @@ def tearDownModule():
 class FilesystemTest(TestCase):
     """Test different synchronizers on file system targets."""
     def setUp(self):
-        prepare_test_folder()
+        prepare_fixtures()
     
     def tearDown(self):
         pass

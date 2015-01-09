@@ -21,7 +21,7 @@ if not "HOME" in os.environ and  "HOMEPATH" in os.environ:
     os.environ.setdefault("HOME", os.environ.get("HOMEPATH", ""))
     print("Initializing HOME environment variable to '%s'" % os.environ["HOME"])
 
-install_requires = []
+install_requires = ["keyring"]
 if sys.version_info < (2, 7):
     install_requires += ["argparse"]
 

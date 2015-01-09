@@ -11,8 +11,8 @@ import sys
 import time
 from datetime import datetime
 
-import colorama
-from ftpsync.targets import IS_REDIRECTED, DRY_RUN_PREFIX, DirMetadata
+from ftpsync.targets import IS_REDIRECTED, DRY_RUN_PREFIX, DirMetadata,\
+    ansi_code
 from ftpsync.resources import FileEntry, DirectoryEntry
 
 def _ts(timestamp):
@@ -57,6 +57,10 @@ class BaseSynchronizer(object):
             self.local.dry_run = True
             self.remote.readonly = True
             self.remote.dry_run = True
+        if not local.connected:
+            local.open()
+        if not remote.connected:
+            remote.open()
         
         self._stats = {"bytes_written": 0,
                        "conflict_files": 0,
@@ -80,7 +84,6 @@ class BaseSynchronizer(object):
                        "upload_bytes_written": 0,
                        "upload_files_written": 0,
                        }
-        colorama.init()
     
     def get_stats(self):
         return self._stats
@@ -247,10 +250,10 @@ class BaseSynchronizer(object):
         
     COLOR_MAP = {#("skip", "*"): colorama.Fore.WHITE + colorama.Style.DIM,
                  #("*", "equal"): colorama.Fore.WHITE + colorama.Style.DIM,
-                 ("delete", "*"): colorama.Fore.RED,
-                 ("*", "modified"): colorama.Fore.BLUE,
-                 ("restore", "*"): colorama.Fore.BLUE,
-                 ("copy", "new"): colorama.Fore.GREEN,
+                 ("delete", "*"): ansi_code("Fore.RED"),
+                 ("*", "modified"): ansi_code("Fore.BLUE"),
+                 ("restore", "*"): ansi_code("Fore.BLUE"),
+                 ("copy", "new"): ansi_code("Fore.GREEN"),
                  }
     
     def _log_action(self, action, status, symbol, entry, min_level=3):
@@ -261,7 +264,7 @@ class BaseSynchronizer(object):
                        CM.get(("*", status), 
                               CM.get((action, "*"), 
                                      "")))
-        final = colorama.Style.RESET_ALL
+        final = ansi_code("Style.RESET_ALL")
 
         prefix = "" 
         if self.dry_run:

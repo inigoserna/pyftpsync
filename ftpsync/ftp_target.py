@@ -13,8 +13,10 @@ import sys
 import time
 
 from ftpsync import targets
-from ftpsync.targets import _Target, DirMetadata
+from ftpsync.targets import _Target, DirMetadata, prompt_for_password,\
+    save_password, get_credentials_for_url
 from ftpsync.resources import DirectoryEntry, FileEntry
+from ftplib import error_perm
 
 DEFAULT_BLOCKSIZE = targets.DEFAULT_BLOCKSIZE
 
@@ -23,16 +25,16 @@ DEFAULT_BLOCKSIZE = targets.DEFAULT_BLOCKSIZE
 #===============================================================================
 class FtpTarget(_Target):
     
-    def __init__(self, path, host, username=None, password=None, connect=True, debug=0):
+    def __init__(self, path, host, username=None, password=None, extra_opts=None):
         path = path or "/"
-        super(FtpTarget, self).__init__(path)
+        super(FtpTarget, self).__init__(path, extra_opts)
         self.ftp = ftplib.FTP()
-        self.ftp.debug(debug)
+        self.ftp.debug(self.get_option("ftp_debug", 0))
         self.host = host
         self.username = username
         self.password = password
-        if connect:
-            self.open()
+#        if connect:
+#            self.open()
 
     def __str__(self):
         return "<ftp:%s%s + %s>" % (self.host, self.root_dir, relpath_url(self.cur_dir, self.root_dir))
@@ -41,18 +43,53 @@ class FtpTarget(_Target):
         return "ftp:%s%s" % (self.host, self.root_dir)
 
     def open(self):
+        assert not self.connected
+        no_prompt  = self.get_option("no_prompt", True)
+        store_password = self.get_option("store_password", False)
+        
         self.ftp.connect(self.host)
-        if self.username:
+        # 
+        if self.username is None or self.password is None:
+            creds = get_credentials_for_url(self.host, allow_prompt=not no_prompt)
+            if creds:
+                self.username, self.password = creds
+
+        try:
+            # Login (as 'anonymous' if self.username is undefined):
             self.ftp.login(self.username, self.password)
+        except error_perm as e:
+            # If credentials were passed, but authentication fails, prompt 
+            # for new password
+            if not e.args[0].startswith("530"):
+                raise # error other then '530 Login incorrect'
+            print(e)
+            if not no_prompt:
+                self.user, self.password = prompt_for_password(self.host, self.username)
+                self.ftp.login(self.username, self.password)
+
         # TODO: case sensitivity?
 #        resp = self.ftp.sendcmd("system")
-#        self.is_unix = "unix" in resp.lower()
-        self.ftp.cwd(self.root_dir)
+#        self.is_unix = "unix" in resp.lower() # not necessarily true, better check with read/write tests
+        
+        try:
+            # 
+            self.ftp.cwd(self.root_dir)
+        except error_perm as e:
+            # If credentials were passed, but authentication fails, prompt 
+            # for new password
+            if not e.args[0].startswith("550"):
+                raise # error other then 550 No such directory'
+            print("Could not change directory to %s (%s): missing permissions?" % (self.root_dir, e))
+
         pwd = self.ftp.pwd()
         if pwd != self.root_dir:
             raise RuntimeError("Unable to navigate to working directory %r" % self.root_dir)
         self.cur_dir = pwd
         self.connected = True
+        # Successfully authenticated: store password
+        if store_password:
+            save_password(self.host, self.username, self.password)
+        return
 
     def close(self):
         if self.connected:

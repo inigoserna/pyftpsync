@@ -31,7 +31,7 @@ from ftpsync.synchronizers import UploadSynchronizer, \
 try:
     import argparse
 except ImportError:
-    print("argparse missing (requires 2.7+, 3.2+ or easy_install)")
+    print("argparse missing (requires 2.7+, 3.2+ or pip/easy_install)")
     raise
 
 
@@ -185,6 +185,12 @@ def run():
 #                             nargs="?",
 #                             default=",".join(DEFAULT_OMIT),
                              help="wildcard of files and directories to exclude (applied after --include)")
+    sync_parser.add_argument("--store-password", 
+                             action="store_true",
+                             help="save password to keyring if login succeeds")
+    sync_parser.add_argument("--no-prompt", 
+                             action="store_true",
+                             help="prevent prompting for missing credentials")
     sync_parser.set_defaults(command="synchronize")
     
     # Parse command line
@@ -202,8 +208,8 @@ def run():
     ftp_debug = 0
     if args.verbose >= 5:
         ftp_debug = 1 
-    args.local_target = make_target(args.local, debug=ftp_debug)
-    args.remote_target = make_target(args.remote, debug=ftp_debug)
+    args.local_target = make_target(args.local, {"ftp_debug": ftp_debug})
+    args.remote_target = make_target(args.remote, {"ftp_debug": ftp_debug})
     if not isinstance(args.local_target, FsTarget) and isinstance(args.remote_target, FsTarget):
         parser.error("a file system target is expected to be local")
 

@@ -39,7 +39,7 @@ $ sudo easy_install -U pyftpsync
 
 or on Windows:
 ```
-> easy_install -U pyftpsync
+> pip install pyftpsync --upgrade
 ```
 
 If you plan to debug or contribute, install to run directly from the source:

@@ -8,6 +8,7 @@ CHANGES
 - Detect conflicts if both targets are modified since last sync.
 - Distinguish whether a resource was added on local or removed on remote.
 - Optionally prompt for username/password.
+- Optionally store credentials in keyring.
 - Colored output
 
 0.2.1

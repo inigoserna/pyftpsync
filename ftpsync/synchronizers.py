@@ -247,9 +247,11 @@ class BaseSynchronizer(object):
     def _log_call(self, msg, min_level=5):
         if self.verbose >= min_level: 
             print(msg)
-        
-    COLOR_MAP = {#("skip", "*"): colorama.Fore.WHITE + colorama.Style.DIM,
-                 #("*", "equal"): colorama.Fore.WHITE + colorama.Style.DIM,
+    
+    # https://github.com/tartley/colorama/blob/master/colorama/ansi.py
+    COLOR_MAP = {("skip", "*"): ansi_code("Fore.LIGHTBLACK_EX"),
+                 ("*", "equal"): ansi_code("Fore.LIGHTBLACK_EX"),#colorama.Fore.WHITE + colorama.Style.DIM,
+                 ("skip", "conflict"): ansi_code("Fore.LIGHTRED_EX"),  # + ansi_code("Style.BRIGHT"),
                  ("delete", "*"): ansi_code("Fore.RED"),
                  ("*", "modified"): ansi_code("Fore.BLUE"),
                  ("restore", "*"): ansi_code("Fore.BLUE"),
@@ -259,13 +261,17 @@ class BaseSynchronizer(object):
     def _log_action(self, action, status, symbol, entry, min_level=3):
         if self.verbose < min_level:
             return
-        CM = self.COLOR_MAP
-        color = CM.get((action, status), 
-                       CM.get(("*", status), 
-                              CM.get((action, "*"), 
-                                     "")))
-        final = ansi_code("Style.RESET_ALL")
-
+        if self.options.get("no_color"):
+            color = ""
+            final = ""
+        else:
+            CM = self.COLOR_MAP
+            color = CM.get((action, status), 
+                           CM.get(("*", status), 
+                                  CM.get((action, "*"), 
+                                         "")))
+            final = ansi_code("Style.RESET_ALL")
+        final += " " * 10
         prefix = "" 
         if self.dry_run:
             prefix = DRY_RUN_PREFIX
@@ -479,7 +485,7 @@ class BiDirSynchronizer(BaseSynchronizer):
     def get_info_strings(self):
         return ("synchronize", "with")
 
-    def _diff(self, local_file, remote_file):
+#     def _diff(self, local_file, remote_file):
 #         print("    Local : %s: %s (native: %s)" % (local_file, local_file.get_adjusted_mtime(), 
 #             _ts(local_file.mtime)))
 #         print("          : last sync %s" 
@@ -489,32 +495,56 @@ class BiDirSynchronizer(BaseSynchronizer):
 #         print("          : last sync %s" 
 #               % (remote_file.get_sync_info()))
 # #         print("    last sync: %s" % _ts(self.local.cur_dir_meta.get_last_sync()))
-        pass
+#         pass
 
+    def _test_and_resolve_conflict(self, is_newer, local, remote):
+        """Return True if this is a conflict and was handled here."""
+#        is_newer = local > remote
+        print("_test_and_resolve_conflict(): is_newer=%s" % is_newer)
+        print("    local: %s" % local)
+        print("    remote: %s" % remote)
+        if is_newer:
+            is_conflict = remote.was_modified_since_last_sync()
+            symbol = ">!"
+        else:
+            is_conflict = local.was_modified_since_last_sync()
+            symbol = "<!"
+        print("_test_and_resolve_conflict(): is_conflict=%s" % is_conflict)
+        if not is_conflict:
+            return False
+        self._inc_stat("conflict_files")
+        action = "skip"
+        self._log_action(action, "conflict", symbol, local, min_level=2)
+#        self._diff(local, remote)
+        return True 
+        
     def sync_newer_local_file(self, local_file, remote_file):
-        is_conflict = remote_file.was_modified_since_last_sync()
         if not self._test_match_or_print(local_file):
             return
-        if is_conflict:
-            self._inc_stat("conflict_files")
-            self._log_action("skip", "conflict", ">!", local_file, min_level=2)
-            self._diff(local_file, remote_file)
+        if self._test_and_resolve_conflict(True, local_file, remote_file):
             return
+#         is_conflict = remote_file.was_modified_since_last_sync()
+#         if is_conflict:
+#             self._inc_stat("conflict_files")
+#             self._log_action("skip", "conflict", ">!", local_file, min_level=2)
+#             self._diff(local_file, remote_file)
+#             return
         self._log_action("copy", "modified", ">", local_file)
-        self._diff(local_file, remote_file)
         self._copy_file(self.local, self.remote, local_file)
 
     def sync_older_local_file(self, local_file, remote_file):
-        if self._test_match_or_print(local_file):
-            is_conflict = local_file.was_modified_since_last_sync()
-            if is_conflict:
-                self._inc_stat("conflict_files")
-                self._log_action("skip", "conflict", "<!", remote_file, min_level=2)
-                self._diff(local_file, remote_file)
-                return
-            self._log_action("copy", "modified", "<", remote_file)
-            self._diff(local_file, remote_file)
-            self._copy_file(self.remote, self.local, remote_file)
+        if not self._test_match_or_print(local_file):
+            return
+        if self._test_and_resolve_conflict(False, local_file, remote_file):
+            return
+#         is_conflict = local_file.was_modified_since_last_sync()
+#         if is_conflict:
+#             self._inc_stat("conflict_files")
+#             self._log_action("skip", "conflict", "<!", remote_file, min_level=2)
+#             self._diff(local_file, remote_file)
+#             return
+        self._log_action("copy", "modified", "<", remote_file)
+        self._copy_file(self.remote, self.local, remote_file)
 
     def sync_missing_local_file(self, remote_file):
         if self._test_match_or_print(remote_file):

@@ -65,10 +65,13 @@ def run():
         description="Synchronize folders over FTP.",
         epilog="See also https://github.com/mar10/pyftpsync"
         )
-    parser.add_argument("--verbose", "-v", action="count", default=3,
+    
+    qv_group = parser.add_mutually_exclusive_group()
+    qv_group.add_argument("--verbose", "-v", action="count", default=3,
                         help="increment verbosity by one (default: %(default)s, range: 0..5)")
-    parser.add_argument("--quiet", "-q", action="count", default=0,
+    qv_group.add_argument("--quiet", "-q", action="count", default=0,
                         help="decrement verbosity by one")
+
     parser.add_argument("--version", action="version", version="%s" % (__version__))
     parser.add_argument("--progress", "-p", 
                         action="store_true",
@@ -191,6 +194,13 @@ def run():
     sync_parser.add_argument("--no-prompt", 
                              action="store_true",
                              help="prevent prompting for missing credentials")
+    sync_parser.add_argument("--no-color", 
+                             action="store_true",
+                             help="prevent use of ansi terminal color codes")
+    sync_parser.add_argument("--resolve", 
+#                             action="store_true",
+                             choices=["old", "new", "local", "remove", "ask"],
+                             help="conflict resolving strategy")
     sync_parser.set_defaults(command="synchronize")
     
     # Parse command line

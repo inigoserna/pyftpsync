@@ -18,6 +18,7 @@ from ftpsync.targets import FsTarget
 
 from ftpsync.synchronizers import DownloadSynchronizer, UploadSynchronizer, \
     BiDirSynchronizer
+import time
 
 
 PYFTPSYNC_TEST_FOLDER = os.environ.get("PYFTPSYNC_TEST_FOLDER") or tempfile.mkdtemp()
@@ -54,7 +55,7 @@ def _write_test_file(name, size=None, content=None, dt=None, age=None):
         
 
 
-def _set_test_file_date(name, dt=None):
+def _set_test_file_date(name, dt=None, ofs_sec=None):
     """Set file access and modification time to `date` (default: now)."""
     path = os.path.join(PYFTPSYNC_TEST_FOLDER, name.replace("/", os.sep))
     if dt is not None:
@@ -225,6 +226,52 @@ class FilesystemTest(TestCase):
         _set_test_file_date("temp1/file3.txt")
         dt = datetime.datetime.now() - datetime.timedelta(seconds=10)
         _set_test_file_date("temp2/file3.txt", dt=dt)
+
+        s = BiDirSynchronizer(local, remote, opts)
+        s.run()
+        stats = s.get_stats()
+#        pprint(stats)
+        self.assertEqual(stats["entries_seen"], 18)
+        self.assertEqual(stats["entries_touched"], 2)
+        self.assertEqual(stats["files_created"], 0)
+        self.assertEqual(stats["files_deleted"], 0)
+        self.assertEqual(stats["files_written"], 2)
+        self.assertEqual(stats["dirs_created"], 0)
+        self.assertEqual(stats["download_files_written"], 1)
+        self.assertEqual(stats["upload_files_written"], 1)
+        self.assertEqual(stats["conflict_files"], 1)
+        self.assertEqual(stats["bytes_written"], 6)
+
+    def test_sync_conflicts(self):
+        local = FsTarget(os.path.join(PYFTPSYNC_TEST_FOLDER, "temp1"))
+        remote = FsTarget(os.path.join(PYFTPSYNC_TEST_FOLDER, "temp2"))
+        opts = {"dry_run": False, "verbose": 3}
+        
+        # Copy temp1 -> temp2
+        
+        s = BiDirSynchronizer(local, remote, opts)
+        s.run()
+        stats = s.get_stats()
+        self.assertEqual(stats["files_written"], 6)
+        self.assertEqual(stats["dirs_created"], 2)
+        
+        
+        # Modify local and remote
+
+        # conflict 1: local is newer 
+        dt = datetime.datetime.now()
+        _set_test_file_date("temp1/file1.txt", dt)
+        dt = datetime.datetime.now() - datetime.timedelta(seconds=10)
+        _set_test_file_date("temp2/file1.txt", dt=dt)
+#         path = os.path.join(PYFTPSYNC_TEST_FOLDER, "temp2/file1.txt")
+#         stamp = time.time() - 10
+#         os.utime(path, (stamp, stamp))
+
+        # conflict 2: remote is newer 
+        _set_test_file_date("temp2/file2.txt")
+        dt = datetime.datetime.now() - datetime.timedelta(seconds=10)
+        _set_test_file_date("temp1/file2.txt", dt=dt)
+
 
         s = BiDirSynchronizer(local, remote, opts)
         s.run()

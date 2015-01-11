@@ -6,4 +6,4 @@ python:
   - "3.3"
   - "3.4"
 script:
-  - nosetests --tests=test/test_flow.py
+  - nosetests -v --tests=test/test_flow.py

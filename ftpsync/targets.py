@@ -28,13 +28,13 @@ try:
     import colorama  # provide color codes, ...
     colorama.init()  # improve color handling on windows terminals
 except ImportError:
-    print("Unable to import 'colorama' library: Colored output may be affected.")
+    print("Unable to import 'colorama' library: Colored output is not available. Try `pip install colorama`.")
     colorama = None
 
 try:
     import keyring
 except ImportError:
-    print("Unable to import 'keyring' library: Storage of passwords is not available.")
+    print("Unable to import 'keyring' library: Storage of passwords is not available. Try `pip install keyring`.")
     keyring = None
 
 
@@ -128,7 +128,10 @@ def save_password(url, username, password):
 def ansi_code(name):
     """Return ansi color or style codes or '' if colorama is not available."""
     try:
-        return getattr(colorama, name)
+        obj = colorama
+        for part in name.split("."):
+            obj = getattr(obj, part)
+        return obj
     except AttributeError:
         return ""
 
@@ -349,6 +352,7 @@ class _Target(object):
         self.meta_stack = []
         
     def __del__(self):
+        # TODO: http://pydev.blogspot.de/2015/01/creating-safe-cyclic-reference.html
         self.close()
 
     def get_base_name(self):

@@ -212,8 +212,7 @@ def to_binary(s):
 #===============================================================================
 class DirMetadata(object):
     
-    META_FILE_NAME = "_pyftpsync-meta.json"
-#     SNAPSHOT_FILE_NAME = "_pyftpsync-snap-%(remote)s.json"
+    META_FILE_NAME = ".pyftpsync-meta.json"
     PRETTY = True # False: Reduce meta file size to 35% (3759 -> 1375 bytes)
     VERSION = 1 # Increment if format changes. Old files will be discarded then.
     
@@ -228,7 +227,6 @@ class DirMetadata(object):
         self.filename = self.META_FILE_NAME
         self.modified_list = False
         self.modified_sync = False
-#        self.readonly = False
         self.was_read = False
         
     def set_mtime(self, filename, mtime, size):

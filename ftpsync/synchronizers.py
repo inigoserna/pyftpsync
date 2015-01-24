@@ -61,7 +61,9 @@ class BaseSynchronizer(object):
             local.open()
         if not remote.connected:
             remote.open()
-        
+
+        self.resolve_all = None
+                
         self._stats = {"bytes_written": 0,
                        "conflict_files": 0,
                        "dirs_created": 0,
@@ -122,6 +124,7 @@ class BaseSynchronizer(object):
                                                       self.local.get_base_name(),
                                                       info_strings[1], 
                                                       self.remote.get_base_name()))
+
         res = self._sync_dir()
         
         stats = self._stats
@@ -497,12 +500,52 @@ class BiDirSynchronizer(BaseSynchronizer):
 # #         print("    last sync: %s" % _ts(self.local.cur_dir_meta.get_last_sync()))
 #         pass
 
-    def _test_and_resolve_conflict(self, is_newer, local, remote):
+    def _interactive_resolve(self, local, remote):
+        """Return 'l', 'r', or 's' to use local, remote resource or skip."""
+        if self.resolve_all:
+            return self.resolve_all
+        resolve = self.options["resolve"] 
+        if resolve in ("local", "remote"):
+            self.resolve_all = resolve
+            return resolve
+
+        RED = ansi_code("Fore.LIGHTRED_EX") + ansi_code("Style.UNDERLINE")
+        M = ansi_code("Style.BRIGHT")
+        R = ansi_code("Style.RESET_ALL")
+
+        print((RED + "CONFLICT in %s:" + R) % local.name)
+        print("    local:  %s" % (local.as_string()))
+        print("    remote: %s" % remote.as_string())
+
+        while True:
+
+#            prompt = "What now (use Local, use Remote, Skip, Help)? "
+            prompt = "Use " + M + "L" + R + "ocal, use " + M + "R" + R + "emote, " + M + "S" + R + "kip, " + M + "H" + R + "elp)? "
+            r = raw_input(prompt)
+            if r in ("h", "H"):
+                print("The following keys are supported:")
+                print("  'r': Use remote file")
+                print("  'l': Use local file")
+                print("  's': Skip this file (leave both versions unchanged)")
+                print("Hold Shift (upper case letters) to apply choice for all remaining conflicts.")
+                print("Hit Ctrl+C top stop.")
+                continue
+            elif r in ("L", "R", "S"):
+                r = r.lower()
+                self.resolve_all = r
+                return r
+            elif r in ("l", "r", "s"):
+                break
+
+        return r
+        
+        
+    def _test_and_resolve_conflict(self, local, remote):
         """Return True if this is a conflict and was handled here."""
-#        is_newer = local > remote
-        print("_test_and_resolve_conflict(): is_newer=%s" % is_newer)
-        print("    local: %s" % local)
-        print("    remote: %s" % remote)
+        is_newer = local > remote
+#         print("_test_and_resolve_conflict(): is_newer=%s" % is_newer)
+#         print("    local : %s" % local)
+#         print("    remote: %s" % remote)
         if is_newer:
             is_conflict = remote.was_modified_since_last_sync()
             symbol = ">!"
@@ -514,6 +557,9 @@ class BiDirSynchronizer(BaseSynchronizer):
             return False
         self._inc_stat("conflict_files")
         action = "skip"
+        opts = self.options
+        if opts["resolve"] == "ask":
+            action  = self._interactive_resolve(local, remote) 
         self._log_action(action, "conflict", symbol, local, min_level=2)
 #        self._diff(local, remote)
         return True 
@@ -521,28 +567,16 @@ class BiDirSynchronizer(BaseSynchronizer):
     def sync_newer_local_file(self, local_file, remote_file):
         if not self._test_match_or_print(local_file):
             return
-        if self._test_and_resolve_conflict(True, local_file, remote_file):
+        if self._test_and_resolve_conflict(local_file, remote_file):
             return
-#         is_conflict = remote_file.was_modified_since_last_sync()
-#         if is_conflict:
-#             self._inc_stat("conflict_files")
-#             self._log_action("skip", "conflict", ">!", local_file, min_level=2)
-#             self._diff(local_file, remote_file)
-#             return
         self._log_action("copy", "modified", ">", local_file)
         self._copy_file(self.local, self.remote, local_file)
 
     def sync_older_local_file(self, local_file, remote_file):
         if not self._test_match_or_print(local_file):
             return
-        if self._test_and_resolve_conflict(False, local_file, remote_file):
+        if self._test_and_resolve_conflict(local_file, remote_file):
             return
-#         is_conflict = local_file.was_modified_since_last_sync()
-#         if is_conflict:
-#             self._inc_stat("conflict_files")
-#             self._log_action("skip", "conflict", "<!", remote_file, min_level=2)
-#             self._diff(local_file, remote_file)
-#             return
         self._log_action("copy", "modified", "<", remote_file)
         self._copy_file(self.remote, self.local, remote_file)
 

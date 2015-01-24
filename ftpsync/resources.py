@@ -46,6 +46,10 @@ class _Resource(object):
                                                    os.path.join(self.rel_path, self.name), 
                                                    self.size, self.dt_modified) #+ " ## %s, %s" % (self.mtime, time.asctime(time.gmtime(self.mtime)))
 
+    def as_string(self):
+        dt = datetime.fromtimestamp(self.get_adjusted_mtime())
+        return "%s, %8s bytes" % (dt.strftime("%Y-%m-%d %H:%M:%S"), self.size)
+
     def __eq__(self, other):
         raise NotImplementedError
 

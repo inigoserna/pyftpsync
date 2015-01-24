@@ -199,6 +199,7 @@ def run():
                              help="prevent use of ansi terminal color codes")
     sync_parser.add_argument("--resolve", 
 #                             action="store_true",
+                             default="ask",
                              choices=["old", "new", "local", "remove", "ask"],
                              help="conflict resolving strategy")
     sync_parser.set_defaults(command="synchronize")
@@ -234,8 +235,12 @@ def run():
         s = BiDirSynchronizer(args.local_target, args.remote_target, opts)
     else:
         parser.error("unknown command %s" % args.command)
-    
-    s.run()
+
+    try:    
+        s.run()
+    except KeyboardInterrupt:
+        print("\nAborted by user.")
+        return
 
     stats = s.get_stats()
     if args.verbose >= 4:

@@ -39,7 +39,7 @@ class BaseSynchronizer(object):
         self.options = options or {}
         self.verbose = self.options.get("verbose", 3) 
         self.dry_run = self.options.get("dry_run", True)
-
+ 
         self.include_files = self.options.get("include_files")
         if self.include_files:
             self.include_files = [ pat.strip() for pat in self.include_files.split(",") ]
@@ -504,13 +504,13 @@ class BiDirSynchronizer(BaseSynchronizer):
         """Return 'l', 'r', or 's' to use local, remote resource or skip."""
         if self.resolve_all:
             return self.resolve_all
-        resolve = self.options["resolve"] 
+        resolve = self.options["resolve"]
         if resolve in ("local", "remote"):
             self.resolve_all = resolve
             return resolve
 
-        RED = ansi_code("Fore.LIGHTRED_EX") + ansi_code("Style.UNDERLINE")
-        M = ansi_code("Style.BRIGHT")
+        RED = ansi_code("Fore.LIGHTRED_EX")
+        M = ansi_code("Style.BRIGHT") + ansi_code("Style.UNDERLINE")
         R = ansi_code("Style.RESET_ALL")
 
         print((RED + "CONFLICT in %s:" + R) % local.name)
@@ -558,7 +558,7 @@ class BiDirSynchronizer(BaseSynchronizer):
         self._inc_stat("conflict_files")
         action = "skip"
         opts = self.options
-        if opts["resolve"] == "ask":
+        if opts.get("resolve") == "ask":
             action  = self._interactive_resolve(local, remote) 
         self._log_action(action, "conflict", symbol, local, min_level=2)
 #        self._diff(local, remote)

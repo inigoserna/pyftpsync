@@ -121,7 +121,7 @@ class FileEntry(_Resource):
     def get_adjusted_mtime(self):
         """Return modification time as stored in metadata (else system mtime)."""
         try:
-            res = float(self.meta["mtime"])
+            res = float(self.meta["m"])
 #            print("META: %s reporting %s instead of %s" % (self.name, time.ctime(res), time.ctime(self.mtime)))
             return res
         except TypeError:
@@ -135,9 +135,9 @@ class FileEntry(_Resource):
         info = self.get_sync_info()
         if not info:
             return None
-        if self.size != info["size"]:
+        if self.size != info["s"]:
             return True
-        if self.get_adjusted_mtime() > info["mtime"]:
+        if self.get_adjusted_mtime() > info["m"]:
             return True
 #         if res:
 #             print("%s was_modified_since_last_sync: %s" % (self, (self.get_adjusted_mtime() - self.target.cur_dir_meta.get_last_sync_with(peer_target))))

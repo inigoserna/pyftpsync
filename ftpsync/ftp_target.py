@@ -172,7 +172,7 @@ class FtpTarget(_Target):
                     # Use calendar.timegm() instead of time.mktime(), because
                     # the date was returned as UTC
                     mtime = calendar.timegm(time.strptime(field_value, "%Y%m%d%H%M%S"))
-#                    print("MLST modify: ", field_value, "mtime", mtime, "ctime", time.ctime(mtime))
+#                    print("MLST modify: ", field_value, "m", mtime, "ctime", time.ctime(mtime))
                 elif field_name == "unique":
                     unique = field_value
                     
@@ -213,12 +213,12 @@ class FtpTarget(_Target):
             for n in meta_files:
                 meta = meta_files[n]
                 if n in entry_map:
-#                    if entry_map[n].size == meta["size"] and entry_map[n].mtime <= last_upload_time:
-                    upload_time = meta.get("uploaded", 0)
+#                    if entry_map[n].size == meta["s"] and entry_map[n].mtime <= last_upload_time:
+                    upload_time = meta.get("u", 0)
                     # ???
                     # TODO: sollten wir prüfen. ob meta.mtime (nicht meta.upload_time) ??
                     # ??? 
-                    if entry_map[n].size == meta.get("size") and entry_map[n].mtime <= upload_time:
+                    if entry_map[n].size == meta.get("s") and entry_map[n].mtime <= upload_time:
                         entry_map[n].meta = meta
                     else:
                         # Discard stored meta-data if 

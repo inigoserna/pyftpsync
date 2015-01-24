@@ -238,9 +238,9 @@ class DirMetadata(object):
         changed by other means and we have to discard our meta data.
         """
         ut = time.time()  # UTC time stamp
-        self.list[filename] = {"mtime": mtime,
-                               "size": size,
-                               "uploaded": ut,
+        self.list[filename] = {"m": mtime,
+                               "s": size,
+                               "u": ut,
                                }
         if self.PRETTY:
             self.list[filename].update({
@@ -259,8 +259,8 @@ class DirMetadata(object):
         assert self.target.is_local()
         remote_target = self.target.peer
         ps = self.dir["peer_sync"].setdefault(remote_target.get_id(), {})
-        pse = ps[filename] = {"mtime": mtime, 
-                              "size": size,
+        pse = ps[filename] = {"m": mtime,
+                              "s": size,
                               }
         if self.PRETTY:
             pse["mtime_str"] = time.ctime(mtime) if mtime else "(directory)"

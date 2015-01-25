@@ -172,7 +172,7 @@ class FtpTarget(_Target):
                     # Use calendar.timegm() instead of time.mktime(), because
                     # the date was returned as UTC
                     mtime = calendar.timegm(time.strptime(field_value, "%Y%m%d%H%M%S"))
-#                    print("MLST modify: ", field_value, "m", mtime, "ctime", time.ctime(mtime))
+#                    print("MLST modify: ", field_value, "mtime", mtime, "ctime", time.ctime(mtime))
                 elif field_name == "unique":
                     unique = field_value
                     
@@ -213,13 +213,13 @@ class FtpTarget(_Target):
             for n in meta_files:
                 meta = meta_files[n]
                 if n in entry_map:
-#                    if entry_map[n].size == meta["s"] and entry_map[n].mtime <= last_upload_time:
+                    # We have a meta-data entry for this resource
                     upload_time = meta.get("u", 0)
-                    # ???
-                    # TODO: sollten wir prüfen. ob meta.mtime (nicht meta.upload_time) ??
-                    # ??? 
+                    # TODO: use 3 sec EPS, to compare mtimes
                     if entry_map[n].size == meta.get("s") and entry_map[n].mtime <= upload_time:
+                        # Use meta-data mtime instead of the one reported by FTP server 
                         entry_map[n].meta = meta
+                        entry_map[n].mtime = meta["m"]
                     else:
                         # Discard stored meta-data if 
                         #   1. the the mtime reported by the FTP server is later
@@ -230,9 +230,10 @@ class FtpTarget(_Target):
 #                        print("META: Removing outdated meta entry %s" % n, meta)
                         missing.append(n)
                 else:
+                    # File is stored in meta-data, but no longer exists on FTP server
 #                     print("META: Removing missing meta entry %s" % n)
                     missing.append(n)
-            # Remove missing files from cur_dir_meta 
+            # Remove missing or invalid files from cur_dir_meta 
             for n in missing:
                 self.cur_dir_meta.remove(n)
 

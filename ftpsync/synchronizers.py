@@ -172,9 +172,10 @@ class BaseSynchronizer(object):
         with src.open_readable(file_entry.name) as fp_src:
             dest.write_file(file_entry.name, fp_src, callback=__block_written)
 
-#         dest.set_mtime(file_entry.name, file_entry.mtime, file_entry.size)
-        dest.set_mtime(file_entry.name, file_entry.get_adjusted_mtime(), file_entry.size)
-        dest.set_sync_info(file_entry.name, file_entry.get_adjusted_mtime(), file_entry.size)
+#         dest.set_mtime(file_entry.name, file_entry.get_adjusted_mtime(), file_entry.size)
+#         dest.set_sync_info(file_entry.name, file_entry.get_adjusted_mtime(), file_entry.size)
+        dest.set_mtime(file_entry.name, file_entry.mtime, file_entry.size)
+        dest.set_sync_info(file_entry.name, file_entry.mtime, file_entry.size)
 
         elap = time.time() - start
         self._inc_stat("write_time", elap)
@@ -500,6 +501,7 @@ class BiDirSynchronizer(BaseSynchronizer):
 # #         print("    last sync: %s" % _ts(self.local.cur_dir_meta.get_last_sync()))
 #         pass
 
+#     _shortcuts = {"r": },
     def _interactive_resolve(self, local, remote):
         """Return 'l', 'r', or 's' to use local, remote resource or skip."""
         if self.resolve_all:

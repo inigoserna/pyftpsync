@@ -518,11 +518,9 @@ class BiDirSynchronizer(BaseSynchronizer):
         print("    remote: %s" % remote.as_string())
 
         while True:
-
-#            prompt = "What now (use Local, use Remote, Skip, Help)? "
             prompt = "Use " + M + "L" + R + "ocal, use " + M + "R" + R + "emote, " + M + "S" + R + "kip, " + M + "H" + R + "elp)? "
-            r = raw_input(prompt)
-            if r in ("h", "H"):
+            r = raw_input(prompt).strip()
+            if r in ("h", "H", "?"):
                 print("The following keys are supported:")
                 print("  'r': Use remote file")
                 print("  'l': Use local file")
@@ -533,7 +531,7 @@ class BiDirSynchronizer(BaseSynchronizer):
             elif r in ("L", "R", "S"):
                 r = r.lower()
                 self.resolve_all = r
-                return r
+                break
             elif r in ("l", "r", "s"):
                 break
 
@@ -552,7 +550,7 @@ class BiDirSynchronizer(BaseSynchronizer):
         else:
             is_conflict = local.was_modified_since_last_sync()
             symbol = "<!"
-        print("_test_and_resolve_conflict(): is_conflict=%s" % is_conflict)
+#         print("_test_and_resolve_conflict(): is_conflict=%s" % is_conflict)
         if not is_conflict:
             return False
         self._inc_stat("conflict_files")

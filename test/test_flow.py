@@ -278,15 +278,9 @@ class FilesystemTest(TestCase):
         stats = s.get_stats()
         pprint(stats)
         self.assertEqual(stats["entries_seen"], 18)
-        self.assertEqual(stats["entries_touched"], 2)
-        self.assertEqual(stats["files_created"], 0)
-        self.assertEqual(stats["files_deleted"], 0)
-        self.assertEqual(stats["files_written"], 2)
-        self.assertEqual(stats["dirs_created"], 0)
-        self.assertEqual(stats["download_files_written"], 1)
-        self.assertEqual(stats["upload_files_written"], 1)
-        self.assertEqual(stats["conflict_files"], 1)
-        self.assertEqual(stats["bytes_written"], 6)
+        self.assertEqual(stats["entries_touched"], 0)
+        self.assertEqual(stats["bytes_written"], 0)
+        self.assertEqual(stats["conflict_files"], 2)
 
 
 #===============================================================================

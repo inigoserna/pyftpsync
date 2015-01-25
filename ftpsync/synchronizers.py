@@ -253,14 +253,14 @@ class BaseSynchronizer(object):
             print(msg)
     
     # https://github.com/tartley/colorama/blob/master/colorama/ansi.py
-    COLOR_MAP = {("skip", "*"): ansi_code("Fore.LIGHTBLACK_EX"),
-                 ("*", "equal"): ansi_code("Fore.LIGHTBLACK_EX"),#colorama.Fore.WHITE + colorama.Style.DIM,
-                 ("skip", "conflict"): ansi_code("Fore.LIGHTRED_EX"),  # + ansi_code("Style.BRIGHT"),
-                 ("delete", "*"): ansi_code("Fore.RED"),
-                 ("*", "modified"): ansi_code("Fore.BLUE"),
-                 ("restore", "*"): ansi_code("Fore.BLUE"),
-                 ("copy", "new"): ansi_code("Fore.GREEN"),
-                 }
+#     COLOR_MAP = {("skip", "*"): ansi_code("Fore.LIGHTBLACK_EX"),
+#                  ("*", "equal"): ansi_code("Fore.LIGHTBLACK_EX"),#colorama.Fore.WHITE + colorama.Style.DIM,
+#                  ("skip", "conflict"): ansi_code("Fore.LIGHTRED_EX"),  # + ansi_code("Style.BRIGHT"),
+#                  ("delete", "*"): ansi_code("Fore.RED"),
+#                  ("*", "modified"): ansi_code("Fore.BLUE"),
+#                  ("restore", "*"): ansi_code("Fore.BLUE"),
+#                  ("copy", "new"): ansi_code("Fore.GREEN"),
+#                  }
     
     def _log_action(self, action, status, symbol, entry, min_level=3):
         if self.verbose < min_level:
@@ -269,12 +269,25 @@ class BaseSynchronizer(object):
             color = ""
             final = ""
         else:
-            CM = self.COLOR_MAP
-            color = CM.get((action, status), 
-                           CM.get(("*", status), 
-                                  CM.get((action, "*"), 
-                                         "")))
+#             CM = self.COLOR_MAP
+#             color = CM.get((action, status), 
+#                            CM.get(("*", status), 
+#                                   CM.get((action, "*"), 
+#                                          "")))
+            if action in ("copy", "restore"):
+                if "<" in symbol:
+                    color = ansi_code("Fore.LIGHTGREEN_EX")+ ansi_code("Style.BRIGHT") if status == "new" else ansi_code("Fore.GREEN")
+                else:
+                    color = ansi_code("Fore.LIGHTBLUE_EX")+ ansi_code("Style.BRIGHT") if status == "new" else ansi_code("Fore.BLUE")
+            elif action == "delete":
+                color = ansi_code("Fore.RED")
+            elif action == "skip" or status == "equal":
+                color = ansi_code("Fore.LIGHTBLACK_EX")
+            elif status == "conflict":
+                color = ansi_code("Fore.LIGHTRED_EX")
+
             final = ansi_code("Style.RESET_ALL")
+        
         final += " " * 10
         prefix = "" 
         if self.dry_run:

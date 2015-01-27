@@ -81,10 +81,11 @@ def get_credentials_for_url(url, allow_prompt):
                 if not "=" in line or line.startswith("#") or line.startswith(";"):
                     continue
                 u, c = line.split("=", 1)
-                if not c or u.strip().lower() != url:
-                    continue
-                c = c.strip()
-                creds = c.split(":", 1)
+                if c and u.strip().lower() == url.lower():
+                    c = c.strip()
+                    creds = c.split(":", 1)
+                    print("Using credentials from %s ('%s'): %s:***)" % (file_path, url, creds[0]))
+                    break
     
     # Query 
     if creds is None and keyring:

@@ -276,15 +276,15 @@ class BaseSynchronizer(object):
 #                                          "")))
             if action in ("copy", "restore"):
                 if "<" in symbol:
-                    color = ansi_code("Fore.LIGHTGREEN_EX") + ansi_code("Style.BRIGHT") if status == "new" else ansi_code("Fore.GREEN")
+                    color = ansi_code("Fore.GREEN") + ansi_code("Style.BRIGHT") if status == "new" else ansi_code("Fore.GREEN")
                 else:
                     color = ansi_code("Fore.CYAN") + ansi_code("Style.BRIGHT") if status == "new" else ansi_code("Fore.CYAN")
             elif action == "delete":
                 color = ansi_code("Fore.RED")
-            elif action == "skip" or status == "equal":
-                color = ansi_code("Fore.LIGHTBLACK_EX")
             elif status == "conflict":
                 color = ansi_code("Fore.LIGHTRED_EX")
+            elif action == "skip" or status == "equal":
+                color = ansi_code("Fore.LIGHTBLACK_EX")
 
             final = ansi_code("Style.RESET_ALL")
         
